@@ -33,7 +33,7 @@ npm install toyobayashi/reactx
 npm install @tybys/reactx
 ```
 
-[API 文档](./docs/api/index)
+[API 文档](./docs/api/index.md)
 
 ## 用法
 
