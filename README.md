@@ -23,7 +23,7 @@
 
 请看下面的用法自行体会。
 
-## 安装
+## 获取
 
 ```bash
 # 从 GitHub
@@ -31,6 +31,14 @@ npm install toyobayashi/reactx
 
 # 从 NPM（暂未发布，先我自己试用和完善）
 npm install @tybys/reactx
+```
+
+从源码构建
+
+```bash
+git clone https://github.com/toyobayashi/reactx.git
+cd reactx
+npm install # 正常安装完成以后会自动跑 prepare 钩子构建出 lib 和 dist 目录
 ```
 
 [API 文档](./docs/api/index.md)
