@@ -10,6 +10,10 @@ function isPrimitive (obj: any): boolean {
   return typeof obj !== 'object' || obj === null
 }
 
+function isNative (Ctor: any): boolean {
+  return typeof Ctor === 'function' && /native code/.test(Ctor.toString())
+}
+
 function assertString (v: any, name: string): void {
   const type = typeof v
   if (type !== 'string') {
@@ -34,6 +38,78 @@ function is (x: any, y: any): boolean {
   } else {
     // eslint-disable-next-line no-self-compare
     return x !== x && y !== y
+  }
+}
+
+const arrayMethodsToPatch = [
+  'push',
+  'pop',
+  'shift',
+  'unshift',
+  'splice',
+  'sort',
+  'reverse'
+]
+
+function createSetTrap (obj: any, onChange?: (path: string, value: any, oldValue?: any) => void, patharr?: string[]): (target: any, p: PropertyKey, value: any, receiver: any) => boolean {
+  patharr = patharr ?? []
+  return function set (target: any, prop: string | number | symbol, value: any): boolean {
+    if (isPrimitive(value) && is(value, obj[prop])) {
+      return true
+    }
+    const paths = patharr!.concat([prop.toString()])
+    const old = obj[prop]
+    obj[prop] = value
+    target[prop] = tryCreateProxy(value, onChange, paths)
+    if (typeof onChange === 'function') {
+      onChange(paths.join('.'), value, old)
+    }
+    return true
+  }
+}
+
+function tryCreateProxy (obj: any, onChange?: (path: string, value: any, oldValue?: any) => void, patharr?: string[]): any {
+  patharr = patharr ?? []
+  if (isPlainObject(obj)) {
+    const o: any = {}
+    const keys = Object.keys(obj)
+    keys.forEach(k => {
+      const value = obj[k]
+      const paths = patharr!.concat([k])
+      o[k] = tryCreateProxy(value, onChange, paths)
+    })
+    const proxy = new Proxy(o, {
+      set: createSetTrap(obj, onChange, patharr)
+    })
+
+    return proxy
+  } else if (Array.isArray(obj)) {
+    const a: any[] = []
+    obj.forEach((value, i) => {
+      const paths = patharr!.concat([String(i)])
+      a[i] = tryCreateProxy(value, onChange, paths)
+    })
+    arrayMethodsToPatch.forEach((method) => {
+      a[method as any] = function (...args: any[]): any {
+        const r = obj[method as any](...args)
+        a.length = 0
+        obj.forEach((value, i) => {
+          const paths = patharr!.concat([String(i)])
+          a[i] = tryCreateProxy(value, onChange, paths)
+        })
+
+        if (typeof onChange === 'function') {
+          onChange((patharr as string[]).join('.'), obj)
+        }
+        return r
+      }
+    })
+    const proxy = new Proxy(a, {
+      set: createSetTrap(obj, onChange, patharr)
+    })
+    return proxy
+  } else {
+    return obj
   }
 }
 
@@ -92,17 +168,9 @@ function tryObserve (obj: any, onChange?: (path: string, value: any, oldValue?: 
       const paths = patharr!.concat([String(i)])
       const observed = tryObserve(value, onChange, paths)
       a[i] = observed
-    });
+    })
 
-    ([
-      'push',
-      'pop',
-      'shift',
-      'unshift',
-      'splice',
-      'sort',
-      'reverse'
-    ]).forEach((method) => {
+    arrayMethodsToPatch.forEach((method) => {
       a[method as any] = function (...args: any[]): any {
         const r = obj[method as any](...args)
         a.length = 0
@@ -131,6 +199,9 @@ function ensureStoreAvailable (obj: any): void {
   }
 }
 
+const isProxyAvailable = typeof Proxy !== 'undefined' && isNative(Proxy)
+const observe = isProxyAvailable ? tryCreateProxy : tryObserve
+
 /**
  * Store class
  * @public
@@ -148,7 +219,7 @@ export class Store<T> {
       configurable: true,
       enumerable: true,
       writable: false,
-      value: tryObserve(initialState, () => {
+      value: observe(initialState, () => {
         this.emit('change')
       })
     })
@@ -160,22 +231,26 @@ export class Store<T> {
     if (!isObject && !Array.isArray(observed)) {
       throw new TypeError('store.set must receive a plain object or an array as first argument')
     }
-    if (!Object.prototype.hasOwnProperty.call(observed, originKey)) {
+    if (!isProxyAvailable && !Object.prototype.hasOwnProperty.call(observed, originKey)) {
       throw new TypeError('Cannot modify a non-observed object')
     }
 
-    if (isObject) {
-      if (Object.prototype.hasOwnProperty.call(observed, keyOrIndex)) {
-        observed[keyOrIndex] = value
+    if (isProxyAvailable) {
+      observed[keyOrIndex] = value
+    } else {
+      if (isObject) {
+        if (Object.prototype.hasOwnProperty.call(observed, keyOrIndex)) {
+          observed[keyOrIndex] = value
+        } else {
+          observed[originKey][keyOrIndex] = value
+          observed[keyOrIndex] = observe(value, () => { this.emit('change') })
+          this.emit('change')
+        }
       } else {
         observed[originKey][keyOrIndex] = value
-        observed[keyOrIndex] = tryObserve(value, () => { this.emit('change') })
+        observed[keyOrIndex] = observe(value, () => { this.emit('change') })
         this.emit('change')
       }
-    } else {
-      observed[originKey][keyOrIndex] = value
-      observed[keyOrIndex] = tryObserve(value, () => { this.emit('change') })
-      this.emit('change')
     }
   }
 
