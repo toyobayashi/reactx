@@ -212,13 +212,16 @@ const observe = isProxyAvailable ? tryCreateProxy : tryObserve
  * Store class
  * @public
  */
-export class Store<T> {
+export class Store<T extends object> {
   private _disposed: boolean
   private _events: { [event: string]: Function[] }
 
   public readonly state!: T
 
   public constructor (initialState: T) {
+    if (!isPlainObject(initialState) && !Array.isArray(initialState)) {
+      throw new TypeError('Initial state must be a plain object or an array')
+    }
     this._disposed = false
     this._events = {}
     Object.defineProperty(this, 'state', {

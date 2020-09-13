@@ -9,7 +9,7 @@ Store class
 <b>Signature:</b>
 
 ```typescript
-export declare class Store<T> 
+export declare class Store<T extends object> 
 ```
 
 ## Constructors
