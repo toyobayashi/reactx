@@ -54,6 +54,15 @@ const arrayMethodsToPatch = [
 function createSetTrap (obj: any, onChange?: (path: string, value: any, oldValue?: any) => void, patharr?: string[]): (target: any, p: PropertyKey, value: any, receiver: any) => boolean {
   patharr = patharr ?? []
   return function set (target: any, prop: string | number | symbol, value: any): boolean {
+    if (Array.isArray(target) && prop === 'length') {
+      obj.length = value
+      target.length = value
+      if (typeof onChange === 'function') {
+        const paths = patharr!.concat([prop.toString()])
+        onChange(paths.join('.'), value)
+      }
+      return true
+    }
     if (isPrimitive(value) && is(value, obj[prop])) {
       return true
     }
@@ -85,18 +94,16 @@ function tryCreateProxy (obj: any, onChange?: (path: string, value: any, oldValu
     return proxy
   } else if (Array.isArray(obj)) {
     const a: any[] = []
-    obj.forEach((value, i) => {
+    const observeItem = (value: any, i: number): void => {
       const paths = patharr!.concat([String(i)])
       a[i] = tryCreateProxy(value, onChange, paths)
-    })
+    }
+    obj.forEach(observeItem)
     arrayMethodsToPatch.forEach((method) => {
       a[method as any] = function (...args: any[]): any {
         const r = obj[method as any](...args)
         a.length = 0
-        obj.forEach((value, i) => {
-          const paths = patharr!.concat([String(i)])
-          a[i] = tryCreateProxy(value, onChange, paths)
-        })
+        obj.forEach(observeItem)
 
         if (typeof onChange === 'function') {
           onChange((patharr as string[]).join('.'), obj)
@@ -115,6 +122,30 @@ function tryCreateProxy (obj: any, onChange?: (path: string, value: any, oldValu
 
 const originKey = '__origin__'
 
+function def (o: any, target: any, prop: string | number, value: any, onChange?: (path: string, value: any, oldValue?: any) => void, patharr?: string[]): void {
+  patharr = patharr ?? []
+  const paths = patharr.concat([prop.toString()])
+  let observed = tryObserve(value, onChange, paths)
+  Object.defineProperty(o, prop, {
+    configurable: true,
+    enumerable: true,
+    get () {
+      return observed
+    },
+    set (v) {
+      if (isPrimitive(v) && is(v, target[prop])) {
+        return
+      }
+      const old = target[prop]
+      target[prop] = v
+      observed = tryObserve(v, onChange, paths)
+      if (typeof onChange === 'function') {
+        onChange(paths.join('.'), v, old)
+      }
+    }
+  })
+}
+
 function tryObserve (obj: any, onChange?: (path: string, value: any, oldValue?: any) => void, patharr?: string[]): any {
   patharr = patharr ?? []
   if (isPlainObject(obj)) {
@@ -130,27 +161,7 @@ function tryObserve (obj: any, onChange?: (path: string, value: any, oldValue?: 
     })
     const keys = Object.keys(obj)
     keys.forEach(k => {
-      const value = obj[k]
-      const paths = patharr!.concat([k])
-      let observed = tryObserve(value, onChange, paths)
-      Object.defineProperty(o, k, {
-        configurable: true,
-        enumerable: true,
-        get () {
-          return observed
-        },
-        set (v) {
-          if (isPrimitive(v) && is(v, obj[k])) {
-            return
-          }
-          const old = obj[k]
-          obj[k] = v
-          observed = tryObserve(v, onChange, paths)
-          if (typeof onChange === 'function') {
-            onChange(paths.join('.'), v, old)
-          }
-        }
-      })
+      def(o, obj, k, obj[k], onChange, patharr)
     })
     return o
   } else if (Array.isArray(obj)) {
@@ -164,21 +175,16 @@ function tryObserve (obj: any, onChange?: (path: string, value: any, oldValue?: 
       writable: false,
       value: obj
     })
-    obj.forEach((value, i) => {
-      const paths = patharr!.concat([String(i)])
-      const observed = tryObserve(value, onChange, paths)
-      a[i] = observed
-    })
+    const observeItem = (value: any, i: number): void => {
+      def(a, obj, i, value, onChange, patharr)
+    }
+    obj.forEach(observeItem)
 
     arrayMethodsToPatch.forEach((method) => {
       a[method as any] = function (...args: any[]): any {
         const r = obj[method as any](...args)
         a.length = 0
-        obj.forEach((value, i) => {
-          const paths = patharr!.concat([String(i)])
-          const observed = tryObserve(value, onChange, paths)
-          a[i] = observed
-        })
+        obj.forEach(observeItem)
 
         if (typeof onChange === 'function') {
           onChange((patharr as string[]).join('.'), obj)
