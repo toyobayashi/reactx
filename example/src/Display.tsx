@@ -5,7 +5,13 @@ import { Store, ProviderStores } from './Store'
 
 const Display: React.FC<{ store: Store }> = function Display (props) {
   console.log('Display render')
-  return <p>{props.store.state.deep.data.count} * 5 = {props.store.countDouble}</p>
+  console.log(props.store)
+  return (
+    <>
+      <p>{props.store.state.deep.data.count.join(', ')}</p>
+      <p>{props.store.state.deep.data.count[0]} * 5 = {props.store.countDouble}</p>
+    </>
+  )
 }
 
 const ConnectedDisplay = connect<ProviderStores>()(Display)
