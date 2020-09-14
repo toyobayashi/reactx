@@ -19,6 +19,8 @@ Reactive state management library for React.
 |  --- | --- |
 |  [connect()](./reactx.connect.md) | Connect store with react component |
 |  [connect(mapProps)](./reactx.connect_1.md) | Connect store with react component |
+|  [nextTick()](./reactx.nexttick.md) | Next tick return a Promise |
+|  [nextTick(cb)](./reactx.nexttick_1.md) | Next tick with callback |
 
 ## Interfaces
 

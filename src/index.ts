@@ -7,11 +7,10 @@
 import { Store } from './store'
 import { connect, InferableComponentEnhancerWithProps, Matching, GetProps, ConnectedComponent, Shared, NonReactStatics, REACT_STATICS, KNOWN_STATICS, MEMO_STATICS, FORWARD_REF_STATICS } from './connect'
 import { Provider, ProviderProps, ProviderState } from './provider'
-// import { nextTick } from './tick'
+import { nextTick } from './tick'
 
 export {
   connect,
-  // nextTick,
   ConnectedComponent,
   FORWARD_REF_STATICS,
   GetProps,
@@ -19,6 +18,7 @@ export {
   KNOWN_STATICS,
   Matching,
   MEMO_STATICS,
+  nextTick,
   NonReactStatics,
   Provider,
   ProviderProps,

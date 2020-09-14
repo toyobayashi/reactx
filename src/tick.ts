@@ -1,12 +1,5 @@
-const inBrowser = typeof window !== 'undefined'
-const UA = inBrowser ? window.navigator.userAgent.toLowerCase() : undefined
-const isIE = UA !== undefined ? /msie|trident/.test(UA) : false
-const isIOS = UA !== undefined ? /iphone|ipad|ipod|ios/.test(UA) : false
-function isNative (Ctor: any): boolean {
-  return typeof Ctor === 'function' && /native code/.test(Ctor.toString())
-}
-
-function noop (): void {}
+import { isNative, noop } from './util'
+import { inBrowser, isIE, isIOS } from './env'
 
 export let isUsingMicroTask = false
 
@@ -24,11 +17,15 @@ function flushCallbacks (): void {
 
 let timerFunc: () => void
 
-if (typeof Promise !== 'undefined' && isNative(Promise)) {
-  const p = Promise.resolve()
+if (typeof queueMicrotask === 'function') {
+  timerFunc = function () {
+    queueMicrotask(flushCallbacks)
+  }
+  isUsingMicroTask = true
+} else if (typeof Promise !== 'undefined' && isNative(Promise)) {
   timerFunc = function () {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    p.then(flushCallbacks)
+    Promise.resolve().then(flushCallbacks)
     if (isIOS) setTimeout(noop)
   }
   isUsingMicroTask = true
