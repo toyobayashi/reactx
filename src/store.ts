@@ -41,6 +41,8 @@ function is (x: any, y: any): boolean {
   }
 }
 
+type ChangeCallback = () => void
+
 const arrayMethodsToPatch = [
   'push',
   'pop',
@@ -51,68 +53,97 @@ const arrayMethodsToPatch = [
   'reverse'
 ]
 
-function createSetTrap (obj: any, onChange?: (path: string, value: any, oldValue?: any) => void, patharr?: string[]): (target: any, p: PropertyKey, value: any, receiver: any) => boolean {
-  patharr = patharr ?? []
+function createSetTrap (obj: any, onChange?: ChangeCallback): (target: any, p: PropertyKey, value: any, receiver: any) => boolean {
   return function set (target: any, prop: string | number | symbol, value: any): boolean {
     if (Array.isArray(target) && prop === 'length') {
       obj.length = value
       target.length = value
       if (typeof onChange === 'function') {
-        const paths = patharr!.concat([prop.toString()])
-        onChange(paths.join('.'), value)
+        onChange()
       }
       return true
     }
     if (isPrimitive(value) && is(value, obj[prop])) {
       return true
     }
-    const paths = patharr!.concat([prop.toString()])
-    const old = obj[prop]
     obj[prop] = value
-    target[prop] = tryCreateProxy(value, onChange, paths)
-    if (typeof onChange === 'function') {
-      onChange(paths.join('.'), value, old)
-    }
+    target[prop] = tryCreateProxy(value, onChange)
+    if (typeof onChange === 'function') onChange()
     return true
   }
 }
 
-function tryCreateProxy (obj: any, onChange?: (path: string, value: any, oldValue?: any) => void, patharr?: string[]): any {
-  patharr = patharr ?? []
+function tryCreateProxy (obj: any, onChange?: ChangeCallback): any {
   if (isPlainObject(obj)) {
     const o: any = {}
     const keys = Object.keys(obj)
     keys.forEach(k => {
       const value = obj[k]
-      const paths = patharr!.concat([k])
-      o[k] = tryCreateProxy(value, onChange, paths)
+      o[k] = tryCreateProxy(value, onChange)
     })
     const proxy = new Proxy(o, {
-      set: createSetTrap(obj, onChange, patharr)
+      set: createSetTrap(obj, onChange)
     })
 
     return proxy
   } else if (Array.isArray(obj)) {
     const a: any[] = []
     const observeItem = (value: any, i: number): void => {
-      const paths = patharr!.concat([String(i)])
-      a[i] = tryCreateProxy(value, onChange, paths)
+      a[i] = tryCreateProxy(value, onChange)
     }
     obj.forEach(observeItem)
-    arrayMethodsToPatch.forEach((method) => {
-      a[method as any] = function (...args: any[]): any {
-        const r = obj[method as any](...args)
-        a.length = 0
-        obj.forEach(observeItem)
 
-        if (typeof onChange === 'function') {
-          onChange((patharr as string[]).join('.'), obj)
-        }
-        return r
+    a.push = function push (...items: any[]) {
+      const r = obj.push(...items)
+      Array.prototype.push.apply(a, items.map(value => tryCreateProxy(value, onChange)))
+      if (typeof onChange === 'function') onChange()
+      return r
+    }
+    a.unshift = function unshift (...items: any[]) {
+      const r = obj.unshift(...items)
+      Array.prototype.unshift.apply(a, items.map(value => tryCreateProxy(value, onChange)))
+      if (typeof onChange === 'function') onChange()
+      return r
+    }
+    a.pop = function pop () {
+      obj.pop()
+      const length = a.length
+      const item = Array.prototype.pop.call(a)
+      if (length !== 0) {
+        if (typeof onChange === 'function') onChange()
       }
-    })
+      return item
+    }
+    a.shift = function shift () {
+      obj.shift()
+      const length = a.length
+      const item = Array.prototype.shift.call(a)
+      if (length !== 0) {
+        if (typeof onChange === 'function') onChange()
+      }
+      return item
+    }
+    a.splice = function splice (start: number, deleteCount: number, ...items: any[]): any[] {
+      obj.splice(start, deleteCount, ...items)
+      const r = Array.prototype.splice.call(a, start, deleteCount, ...(items.map((value) => tryCreateProxy(value, onChange))))
+      if (typeof onChange === 'function') onChange()
+      return r
+    }
+    a.sort = function sort (compareFn?: (a: any, b: any) => number) {
+      obj.sort(compareFn)
+      a.length = 0
+      obj.forEach(observeItem)
+      if (typeof onChange === 'function') onChange()
+      return a
+    }
+    a.reverse = function reverse () {
+      obj.reverse()
+      const r = Array.prototype.reverse.call(a)
+      if (typeof onChange === 'function') onChange()
+      return r
+    }
     const proxy = new Proxy(a, {
-      set: createSetTrap(obj, onChange, patharr)
+      set: createSetTrap(obj, onChange)
     })
     return proxy
   } else {
@@ -122,10 +153,8 @@ function tryCreateProxy (obj: any, onChange?: (path: string, value: any, oldValu
 
 const originKey = '__origin__'
 
-function def (o: any, target: any, prop: string | number, value: any, onChange?: (path: string, value: any, oldValue?: any) => void, patharr?: string[]): void {
-  patharr = patharr ?? []
-  const paths = patharr.concat([prop.toString()])
-  let observed = tryObserve(value, onChange, paths)
+function def (o: any, target: any, prop: string, value: any, onChange?: ChangeCallback): void {
+  let observed = tryObserve(value, onChange)
   Object.defineProperty(o, prop, {
     configurable: true,
     enumerable: true,
@@ -136,21 +165,17 @@ function def (o: any, target: any, prop: string | number, value: any, onChange?:
       if (isPrimitive(v) && is(v, target[prop])) {
         return
       }
-      const old = target[prop]
       target[prop] = v
-      observed = tryObserve(v, onChange, paths)
-      if (typeof onChange === 'function') {
-        onChange(paths.join('.'), v, old)
-      }
+      observed = tryObserve(v, onChange)
+      if (typeof onChange === 'function') onChange()
     }
   })
 }
 
-function tryObserve (obj: any, onChange?: (path: string, value: any, oldValue?: any) => void, patharr?: string[]): any {
-  patharr = patharr ?? []
+function tryObserve (obj: any, onChange?: ChangeCallback): any {
   if (isPlainObject(obj)) {
     if (Object.prototype.hasOwnProperty.call(obj, originKey)) {
-      return tryObserve(obj[originKey], onChange, patharr)
+      return tryObserve(obj[originKey], onChange)
     }
     const o = {}
     Object.defineProperty(o, originKey, {
@@ -161,12 +186,12 @@ function tryObserve (obj: any, onChange?: (path: string, value: any, oldValue?: 
     })
     const keys = Object.keys(obj)
     keys.forEach(k => {
-      def(o, obj, k, obj[k], onChange, patharr)
+      def(o, obj, k, obj[k], onChange)
     })
     return o
   } else if (Array.isArray(obj)) {
     if (Object.prototype.hasOwnProperty.call(obj, originKey)) {
-      return tryObserve(obj[originKey as any], onChange, patharr)
+      return tryObserve(obj[originKey as any], onChange)
     }
     const a: any[] = []
     Object.defineProperty(a, originKey, {
@@ -176,7 +201,7 @@ function tryObserve (obj: any, onChange?: (path: string, value: any, oldValue?: 
       value: obj
     })
     const observeItem = (value: any, i: number): void => {
-      def(a, obj, i, value, onChange, patharr)
+      def(a, obj, i.toString(), value, onChange)
     }
     obj.forEach(observeItem)
 
@@ -186,9 +211,7 @@ function tryObserve (obj: any, onChange?: (path: string, value: any, oldValue?: 
         a.length = 0
         obj.forEach(observeItem)
 
-        if (typeof onChange === 'function') {
-          onChange((patharr as string[]).join('.'), obj)
-        }
+        if (typeof onChange === 'function') onChange()
         return r
       }
     })
@@ -216,7 +239,7 @@ export class Store<T extends object> {
   private _disposed: boolean
   private _events: { [event: string]: Function[] }
 
-  public readonly state!: T
+  public state!: T
 
   public constructor (initialState: T) {
     if (!isPlainObject(initialState) && !Array.isArray(initialState)) {
@@ -224,13 +247,19 @@ export class Store<T extends object> {
     }
     this._disposed = false
     this._events = {}
+    const onChange = (): void => { this.emit('change') }
+    let _state = observe(initialState, onChange)
     Object.defineProperty(this, 'state', {
       configurable: true,
       enumerable: true,
-      writable: false,
-      value: observe(initialState, () => {
-        this.emit('change')
-      })
+      get: () => _state,
+      set: (state) => {
+        if (!isPlainObject(state) && !Array.isArray(state)) {
+          throw new TypeError('State must be a plain object or an array')
+        }
+        _state = observe(state, onChange)
+        onChange()
+      }
     })
   }
 
