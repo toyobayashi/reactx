@@ -39,6 +39,11 @@ npm install @tybys/reactx
 git clone https://github.com/toyobayashi/reactx.git
 cd reactx
 npm install # 正常安装完成以后会自动跑 prepare 钩子构建出 lib 和 dist 目录
+
+# 跑例子
+cd example
+npm install
+npm run serve
 ```
 
 [API 文档](./docs/api/index.md)
@@ -119,7 +124,7 @@ npm install # 正常安装完成以后会自动跑 prepare 钩子构建出 lib �
     </>)
     ```
 
-3. 类似 `react-redux` 利用 `connect` 连接**需要访问 store 中状态**的组件，只有连接过的组件才能响应 store 状态的变化重新渲染变化的数据。
+3. 类似 `react-redux` 利用 `connect` 连接**需要访问 store 中状态**的组件，只有连接过的组件才能响应 store 状态的变化重新渲染变化的数据
 
     ```jsx
     // Display.jsx
@@ -178,7 +183,7 @@ npm install # 正常安装完成以后会自动跑 prepare 钩子构建出 lib �
 
 ## 注意事项
 
-* 初始状态必须是对象或数组
+* 初始状态必须是对象或数组。
 
     ```js
     class extends reactx.Store {
@@ -189,14 +194,38 @@ npm install # 正常安装完成以后会自动跑 prepare 钩子构建出 lib �
     }
     ```
 
-* 在不支持 `Proxy` 的环境下，所有状态需要先定义好，不可直接动态添加，但可以通过 Store 的 `set` 方法添加。支持 `Proxy` 的环境没有此限制
+* 在不支持 `Proxy` 的环境下，所有状态需要先定义好，不可直接动态添加，但可以通过 Store 的 `set` 方法添加。支持 `Proxy` 的环境没有此限制。
 
     ```js
-    this.state.notExist = 'xxx' // notExist 属性在初始化的时候不存在，这是不可监听的
-    this.set(this.state, 'notExist', 'xxx') // OK
+    class extends reactx.Store {
+      constructor () {
+        super({ a: 1 }) // 不存在 notExist 属性
+      }
+
+      change () {
+        this.state.notExist = 'xxx' // notExist 属性在初始化的时候不存在，这是不可监听的，视图不会更新
+        this.set(this.state, 'notExist', 'xxx') // OK
+      }
+    }
     ```
 
-* 数组的 `push`, `pop`, `shift`, `unshift`, `splice`, `sort`, `reverse` 方法可以被监听到。在不支持 `Proxy` 的环境下，修改数组的 `length` 不可监听，支持 `Proxy` 的环境没有此限制。
+* 在不支持 `Proxy` 的环境下，`Store.prototype.set` 第一个参数必须是该 store 实例本身的状态，不可以传入其他 store 的状态，支持 `Proxy` 的环境没有此限制（但此时已经不需要 `Store.prototype.set` 了）。
+
+    ``` js
+    class StoreA extends reactx.Store { /* ... */ }
+    const storeA = new StoreA()
+
+    class StoreB extends reactx.Store {
+      constructor () { /* ... */ }
+      change () {
+        this.set(storeA.state.xxx, 'yyy', 'yyy') // 不可以
+        storeA.set(storeA.state.xxx, 'yyy', 'yyy') // OK
+        this.set(this.state.xxx, 'yyy', 'yyy') // OK
+      }
+    }
+    ```
+
+* 数组的 `push`, `pop`, `shift`, `unshift`, `splice`, `sort`, `reverse` 方法可以被监听到从而触发更新视图。在不支持 `Proxy` 的环境下，修改数组的 `length` 不可监听，支持 `Proxy` 的环境没有此限制。
 
     ```js
     class extends reactx.Store {
@@ -206,12 +235,12 @@ npm install # 正常安装完成以后会自动跑 prepare 钩子构建出 lib �
 
       change () {
         this.state.arr.push(10) // OK
-        this.state.arr.length = 1 // 不支持 Proxy 的环境不可监听
+        this.state.arr.length = 1 // 不支持 Proxy 的环境不可监听，而且会产生预期外的 BUG
       }
     }
     ```
 
-* 尽量避免修改大对象或大数组的引用，或在大数组上调用可监听的成员方法，可能会产生性能问题，因为这样要重新深度观测新对象里面的所有数据
+* 应尽量避免修改大对象或大数组的引用，或在不支持 `Proxy` 的环境下调用大数组的可监听的成员方法，可能会产生性能问题，因为这样要重新深度观测新对象里面的所有数据。
 
     ```js
     class extends reactx.Store {
@@ -225,13 +254,41 @@ npm install # 正常安装完成以后会自动跑 prepare 钩子构建出 lib �
       change () {
         this.state.obj = { /* 里面数据很多很深 */ } // 不推荐
         this.state.arr = [ /* 里面数据很多很深 */ ] // 不推荐
-        this.state.arr.push() // 不推荐
-        this.state.arr.pop() // 不推荐
-        this.state.arr.shift() // 不推荐
-        this.state.arr.unshift() // 不推荐
-        this.state.arr.splice() // 不推荐
-        this.state.arr.sort() // 不推荐
-        this.state.arr.reverse() // 不推荐
+
+        // 如果是不支持 Proxy 的环境，以下操作同样不推荐
+        this.state.arr.push()
+        this.state.arr.pop()
+        this.state.arr.shift()
+        this.state.arr.unshift()
+        this.state.arr.splice()
+        this.state.arr.sort()
+        this.state.arr.reverse()
       }
     }
+    ```
+
+* 如果要在状态改变以后获取 DOM 上的新数据，请使用 `nextTick`。
+
+    ```jsx
+    class extends reactx.Store {
+      constructor () {
+        super({ a: '0' })
+      }
+
+      change () {
+        this.state.a = '1'
+      }
+    }
+    ```
+
+    ```jsx
+    import { nextTick } from '@tybys/reactx'
+
+    (<div id='xxx'>{store.state.a}</div>)
+
+    store.change()
+    // 这里 document.getElementById('xxx').innerHTML === '0'
+    nextTick(() => {
+      document.getElementById('xxx').innerHTML === '1' // true
+    })
     ```
