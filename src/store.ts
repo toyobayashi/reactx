@@ -1,4 +1,4 @@
-import { hasProxy } from './env'
+import { hasProxy, isIE9, isIE10 } from './env'
 import {
   isPlainObject,
   isPrimitive,
@@ -204,36 +204,40 @@ function tryObserve (obj: any, onChange?: ChangeCallback): any {
 
     const proto: any = []
     arrayMethodsToPatch.forEach(m => {
-      Object.defineProperty(proto, m, {
-        configurable: true,
-        writable: true,
-        enumerable: false,
-        value: function (...args: any[]): any {
-          obj[m as any](...args)
-          let items: any[]
-          let shouldNotify: boolean = false
-          switch (m) {
-            case 'push':
-            case 'unshift':
-              items = args.map(mapItem)
-              shouldNotify = true
-              break
-            case 'splice':
-              items = args.map((value, i) => i > 1 ? tryObserve(value, onChange) : value)
-              shouldNotify = true
-              break
-            default:
-              items = args
-              shouldNotify = this.length > 0
-              break
-          }
-
-          const r = Array.prototype[m as any].apply(this, items)
-
-          if (shouldNotify && typeof onChange === 'function') onChange()
-          return r
+      const method = function (this: any[], ...args: any[]): any {
+        obj[m as any](...args)
+        let items: any[]
+        let shouldNotify: boolean = false
+        switch (m) {
+          case 'push':
+          case 'unshift':
+            items = args.map(mapItem)
+            shouldNotify = true
+            break
+          case 'splice':
+            items = args.map((value, i) => i > 1 ? tryObserve(value, onChange) : value)
+            shouldNotify = true
+            break
+          default:
+            items = args
+            shouldNotify = this.length > 0
+            break
         }
-      })
+
+        const r = Array.prototype[m as any].apply(this, items)
+        if (shouldNotify && typeof onChange === 'function') onChange()
+        return r
+      }
+      if (isIE9 || isIE10) {
+        proto[m as any] = method
+      } else {
+        Object.defineProperty(proto, m, {
+          configurable: true,
+          writable: true,
+          enumerable: false,
+          value: method
+        })
+      }
     })
     setPrototypeOf(a, proto)
 
