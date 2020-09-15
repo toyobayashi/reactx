@@ -19,23 +19,38 @@ const arrayMethodsToPatch = [
   'reverse'
 ]
 
-function createSetTrap (obj: any, onChange?: ChangeCallback): (target: any, p: PropertyKey, value: any, receiver: any) => boolean {
-  return function set (target: any, prop: string | number | symbol, value: any): boolean {
-    if (Array.isArray(target) && prop === 'length') {
-      obj.length = value
-      target.length = value
-      if (typeof onChange === 'function') {
-        onChange()
+function createProxyHandlers (obj: any, onChange?: ChangeCallback): {
+  deleteProperty: (target: any, p: PropertyKey) => boolean
+  set: (target: any, p: PropertyKey, value: any, receiver: any) => boolean
+} {
+  return {
+    deleteProperty (target: any, p: PropertyKey) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete obj[p]
+      if (Object.prototype.hasOwnProperty.call(target, p)) {
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        delete target[p]
+        if (typeof onChange === 'function') onChange()
+        return true
       }
+      return false
+    },
+    set (target: any, prop: string | number | symbol, value: any): boolean {
+      if (Array.isArray(target) && prop === 'length') {
+        if (target.length === value && obj.length === value) return true
+        obj.length = value
+        target.length = value
+        if (typeof onChange === 'function') onChange()
+        return true
+      }
+      if (isPrimitive(value) && is(value, obj[prop])) {
+        return true
+      }
+      obj[prop] = value
+      target[prop] = tryCreateProxy(value, onChange)
+      if (typeof onChange === 'function') onChange()
       return true
     }
-    if (isPrimitive(value) && is(value, obj[prop])) {
-      return true
-    }
-    obj[prop] = value
-    target[prop] = tryCreateProxy(value, onChange)
-    if (typeof onChange === 'function') onChange()
-    return true
   }
 }
 
@@ -47,9 +62,7 @@ function tryCreateProxy (obj: any, onChange?: ChangeCallback): any {
       const value = obj[k]
       o[k] = tryCreateProxy(value, onChange)
     })
-    const proxy = new Proxy(o, {
-      set: createSetTrap(obj, onChange)
-    })
+    const proxy = new Proxy(o, createProxyHandlers(obj, onChange))
 
     return proxy
   } else if (Array.isArray(obj)) {
@@ -108,9 +121,7 @@ function tryCreateProxy (obj: any, onChange?: ChangeCallback): any {
       if (typeof onChange === 'function') onChange()
       return r
     }
-    const proxy = new Proxy(a, {
-      set: createSetTrap(obj, onChange)
-    })
+    const proxy = new Proxy(a, createProxyHandlers(obj, onChange))
     return proxy
   } else {
     return obj
@@ -197,6 +208,10 @@ function ensureStoreAvailable (obj: any): void {
 const isProxyAvailable = typeof Proxy !== 'undefined' && isNative(Proxy)
 const observe = isProxyAvailable ? tryCreateProxy : tryObserve
 
+function emitChange (store: Store<any>): void {
+  store.emit('change')
+}
+
 /**
  * Store class
  * @public
@@ -213,7 +228,7 @@ export class Store<T extends object> {
     }
     this._disposed = false
     this._events = {}
-    const onChange = (): void => { this.emit('change') }
+    const onChange = (): void => { emitChange(this) }
     let _state = observe(initialState, onChange)
     Object.defineProperty(this, 'state', {
       configurable: true,
@@ -247,13 +262,13 @@ export class Store<T extends object> {
           observed[keyOrIndex] = value
         } else {
           observed[originKey][keyOrIndex] = value
-          observed[keyOrIndex] = observe(value, () => { this.emit('change') })
-          this.emit('change')
+          observed[keyOrIndex] = observe(value, () => { emitChange(this) })
+          emitChange(this)
         }
       } else {
         observed[originKey][keyOrIndex] = value
-        observed[keyOrIndex] = observe(value, () => { this.emit('change') })
-        this.emit('change')
+        observed[keyOrIndex] = observe(value, () => { emitChange(this) })
+        emitChange(this)
       }
     }
   }
