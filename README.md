@@ -225,7 +225,7 @@ npm run serve
     }
     ```
 
-* 数组的 `push`, `pop`, `shift`, `unshift`, `splice`, `sort`, `reverse` 方法可以被监听到从而触发更新视图。在不支持 `Proxy` 的环境下，修改数组的 `length` 不可监听，支持 `Proxy` 的环境没有此限制。
+* 数组的 `push`, `pop`, `shift`, `unshift`, `splice`, `sort`, `reverse` 方法可以被监听到从而触发更新视图。在不支持 `Proxy` 的环境下，通过索引修改数组元素，或直接修改数组的 `length` 是不可监听的，支持 `Proxy` 的环境没有此限制。
 
     ```js
     class extends reactx.Store {
@@ -235,34 +235,31 @@ npm run serve
 
       change () {
         this.state.arr.push(10) // OK
-        this.state.arr.length = 1 // 不支持 Proxy 的环境不可监听，而且会产生预期外的 BUG
+
+        this.state.arr[0] = 5 // 不支持 Proxy 的环境不会更新视图
+        this.set(this.state.arr, 0, 5) // OK
+
+        // 不支持 Proxy 的环境请千万不要直接修改数组的 length
+        // 不仅不会更新视图，而且会产生预期外的 BUG
+        this.state.arr.length = 0 
       }
     }
     ```
 
-* 应尽量避免修改大对象或大数组的引用，或在不支持 `Proxy` 的环境下调用大数组的可监听的成员方法，可能会产生性能问题，因为这样要重新深度观测新对象里面的所有数据。
+* 应尽量避免赋值大对象或大数组的引用，可能会产生性能问题，因为这样要重新深度观测新对象里面的所有数据。
 
     ```js
     class extends reactx.Store {
       constructor () {
         super({ 
-          obj: { /* 里面数据很多很深 */ },
-          arr: [ /* 里面数据很多很深 */ ] 
+          obj: { /* ... */ },
+          arr: [ /* ... */ ] 
         })
       }
 
       change () {
-        this.state.obj = { /* 里面数据很多很深 */ } // 不推荐
-        this.state.arr = [ /* 里面数据很多很深 */ ] // 不推荐
-
-        // 如果是不支持 Proxy 的环境，以下操作同样不推荐
-        this.state.arr.push()
-        this.state.arr.pop()
-        this.state.arr.shift()
-        this.state.arr.unshift()
-        this.state.arr.splice()
-        this.state.arr.sort()
-        this.state.arr.reverse()
+        this.state.obj = { /* 数据很深，包含上千上万项 */ } // 不推荐
+        this.state.arr = [ /* 数据很深，包含上千上万项 */ ] // 不推荐
       }
     }
     ```
@@ -286,7 +283,7 @@ npm run serve
 
     (<div id='xxx'>{store.state.a}</div>)
 
-    store.change()
+    store.change() // 虽然数据是同步更改的，但是 React 组件是异步更新的
     // 这里 document.getElementById('xxx').innerHTML === '0'
     nextTick(() => {
       document.getElementById('xxx').innerHTML === '1' // true
