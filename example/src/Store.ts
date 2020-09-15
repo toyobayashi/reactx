@@ -1,5 +1,7 @@
 import { Store as BaseStore } from '../..'
 
+const useProxy = typeof Proxy === 'function'
+
 export interface StoreState {
   deep: {
     data: {
@@ -21,12 +23,22 @@ export class Store extends BaseStore<StoreState> {
 
   public increment (): void {
     this.state.deep.data.count.push(this.state.deep.data.count.length)
-    this.state.deep.data.count[0]++
+    if (useProxy) {
+      this.state.deep.data.count[0]++
+    } else {
+      this.set(this.state.deep.data.count, 0, this.state.deep.data.count[0] + 1)
+    }
   }
 
   public decrement (): void {
-    this.state.deep.data.count[0]--
-    this.state.deep.data.count.length--
+    if (this.state.deep.data.count.length > 0) {
+      if (useProxy) {
+        this.state.deep.data.count[0]--
+      } else {
+        this.set(this.state.deep.data.count, 0, this.state.deep.data.count[0] - 1)
+      }
+      this.state.deep.data.count.length--
+    }
   }
 
   public get countDouble (): number {
@@ -37,8 +49,20 @@ export class Store extends BaseStore<StoreState> {
     return new Promise((resolve) => {
       setTimeout(resolve, 500)
     }).then(() => {
-      this.state.deep.data.count[0] *= 2
+      if (useProxy) {
+        this.state.deep.data.count[0] *= 2
+      } else {
+        this.set(this.state.deep.data.count, 0, this.state.deep.data.count[0] * 2)
+      }
     })
+  }
+
+  public reverse (): void {
+    this.state.deep.data.count.reverse()
+  }
+
+  public sort (): void {
+    this.state.deep.data.count.sort((a, b) => (a - b))
   }
 }
 

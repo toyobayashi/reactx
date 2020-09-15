@@ -1,10 +1,11 @@
+import { hasProxy } from './env'
 import {
   isPlainObject,
   isPrimitive,
-  isNative,
   assertString,
   assertFunction,
-  is
+  is,
+  setPrototypeOf
 } from './util'
 
 type ChangeCallback = () => void
@@ -18,6 +19,76 @@ const arrayMethodsToPatch = [
   'sort',
   'reverse'
 ]
+
+function patchArray (obj: any[], proxyTarget: any[], onChange?: ChangeCallback): void {
+  const overwrite = {
+    push (...items: any[]) {
+      obj.push(...items)
+      const r = Array.prototype.push.apply(proxyTarget, items.map(value => tryCreateProxy(value, onChange)))
+      if (typeof onChange === 'function') onChange()
+      return r
+    },
+    unshift (...items: any[]) {
+      obj.unshift(...items)
+      const r = Array.prototype.unshift.apply(proxyTarget, items.map(value => tryCreateProxy(value, onChange)))
+      if (typeof onChange === 'function') onChange()
+      return r
+    },
+    pop () {
+      obj.pop()
+      const length = proxyTarget.length
+      const item = Array.prototype.pop.call(proxyTarget)
+      if (length !== 0) {
+        if (typeof onChange === 'function') onChange()
+      }
+      return item
+    },
+    shift () {
+      obj.shift()
+      const length = proxyTarget.length
+      const item = Array.prototype.shift.call(proxyTarget)
+      if (length !== 0) {
+        if (typeof onChange === 'function') onChange()
+      }
+      return item
+    },
+    splice (start: number, deleteCount: number, ...items: any[]): any[] {
+      obj.splice(start, deleteCount, ...items)
+      const r = Array.prototype.splice.call(proxyTarget, start, deleteCount, ...(items.map((value) => tryCreateProxy(value, onChange))))
+      if (typeof onChange === 'function') onChange()
+      return r
+    },
+    sort (compareFn?: (a: any, b: any) => number) {
+      obj.sort(compareFn)
+      const r = Array.prototype.sort.call(proxyTarget, compareFn)
+      const length = proxyTarget.length
+      if (length !== 0) {
+        if (typeof onChange === 'function') onChange()
+      }
+      return r
+    },
+    reverse () {
+      obj.reverse()
+      const r = Array.prototype.reverse.call(proxyTarget)
+      const length = proxyTarget.length
+      if (length !== 0) {
+        if (typeof onChange === 'function') onChange()
+      }
+      return r
+    }
+  }
+
+  const proto: any = []
+  Object.keys(overwrite).forEach(m => {
+    Object.defineProperty(proto, m, {
+      configurable: true,
+      writable: true,
+      enumerable: false,
+      value: overwrite[m as keyof typeof overwrite]
+    })
+  })
+  setPrototypeOf(proxyTarget, proto)
+}
 
 function createProxyHandlers (obj: any, onChange?: ChangeCallback): {
   deleteProperty: (target: any, p: PropertyKey) => boolean
@@ -72,55 +143,7 @@ function tryCreateProxy (obj: any, onChange?: ChangeCallback): any {
     }
     obj.forEach(observeItem)
 
-    a.push = function push (...items: any[]) {
-      const r = obj.push(...items)
-      Array.prototype.push.apply(a, items.map(value => tryCreateProxy(value, onChange)))
-      if (typeof onChange === 'function') onChange()
-      return r
-    }
-    a.unshift = function unshift (...items: any[]) {
-      const r = obj.unshift(...items)
-      Array.prototype.unshift.apply(a, items.map(value => tryCreateProxy(value, onChange)))
-      if (typeof onChange === 'function') onChange()
-      return r
-    }
-    a.pop = function pop () {
-      obj.pop()
-      const length = a.length
-      const item = Array.prototype.pop.call(a)
-      if (length !== 0) {
-        if (typeof onChange === 'function') onChange()
-      }
-      return item
-    }
-    a.shift = function shift () {
-      obj.shift()
-      const length = a.length
-      const item = Array.prototype.shift.call(a)
-      if (length !== 0) {
-        if (typeof onChange === 'function') onChange()
-      }
-      return item
-    }
-    a.splice = function splice (start: number, deleteCount: number, ...items: any[]): any[] {
-      obj.splice(start, deleteCount, ...items)
-      const r = Array.prototype.splice.call(a, start, deleteCount, ...(items.map((value) => tryCreateProxy(value, onChange))))
-      if (typeof onChange === 'function') onChange()
-      return r
-    }
-    a.sort = function sort (compareFn?: (a: any, b: any) => number) {
-      obj.sort(compareFn)
-      a.length = 0
-      obj.forEach(observeItem)
-      if (typeof onChange === 'function') onChange()
-      return a
-    }
-    a.reverse = function reverse () {
-      obj.reverse()
-      const r = Array.prototype.reverse.call(a)
-      if (typeof onChange === 'function') onChange()
-      return r
-    }
+    patchArray(obj, a, onChange)
     const proxy = new Proxy(a, createProxyHandlers(obj, onChange))
     return proxy
   } else {
@@ -170,28 +193,49 @@ function tryObserve (obj: any, onChange?: ChangeCallback): any {
     if (Object.prototype.hasOwnProperty.call(obj, originKey)) {
       return tryObserve(obj[originKey as any], onChange)
     }
-    const a: any[] = []
+    const mapItem = (value: any): any => tryObserve(value, onChange)
+    const a: any[] = obj.map(mapItem)
     Object.defineProperty(a, originKey, {
       configurable: true,
       enumerable: false,
       writable: false,
       value: obj
     })
-    const observeItem = (value: any, i: number): void => {
-      def(a, obj, i.toString(), value, onChange)
-    }
-    obj.forEach(observeItem)
 
-    arrayMethodsToPatch.forEach((method) => {
-      a[method as any] = function (...args: any[]): any {
-        const r = obj[method as any](...args)
-        a.length = 0
-        obj.forEach(observeItem)
+    const proto: any = []
+    arrayMethodsToPatch.forEach(m => {
+      Object.defineProperty(proto, m, {
+        configurable: true,
+        writable: true,
+        enumerable: false,
+        value: function (...args: any[]): any {
+          obj[m as any](...args)
+          let items: any[]
+          let shouldNotify: boolean = false
+          switch (m) {
+            case 'push':
+            case 'unshift':
+              items = args.map(mapItem)
+              shouldNotify = true
+              break
+            case 'splice':
+              items = args.map((value, i) => i > 1 ? tryObserve(value, onChange) : value)
+              shouldNotify = true
+              break
+            default:
+              items = args
+              shouldNotify = this.length > 0
+              break
+          }
 
-        if (typeof onChange === 'function') onChange()
-        return r
-      }
+          const r = Array.prototype[m as any].apply(this, items)
+
+          if (shouldNotify && typeof onChange === 'function') onChange()
+          return r
+        }
+      })
     })
+    setPrototypeOf(a, proto)
 
     return a
   } else {
@@ -205,8 +249,7 @@ function ensureStoreAvailable (obj: any): void {
   }
 }
 
-const isProxyAvailable = typeof Proxy !== 'undefined' && isNative(Proxy)
-const observe = isProxyAvailable ? tryCreateProxy : tryObserve
+const observe = hasProxy ? tryCreateProxy : tryObserve
 
 function emitChange (store: Store<any>): void {
   store.emit('change')
@@ -250,11 +293,11 @@ export class Store<T extends object> {
     if (!isObject && !Array.isArray(observed)) {
       throw new TypeError('store.set must receive a plain object or an array as first argument')
     }
-    if (!isProxyAvailable && !Object.prototype.hasOwnProperty.call(observed, originKey)) {
+    if (!hasProxy && !Object.prototype.hasOwnProperty.call(observed, originKey)) {
       throw new TypeError('Cannot modify a non-observed object')
     }
 
-    if (isProxyAvailable) {
+    if (hasProxy) {
       observed[keyOrIndex] = value
     } else {
       if (isObject) {

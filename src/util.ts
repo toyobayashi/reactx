@@ -42,3 +42,20 @@ export function is (x: any, y: any): boolean {
 }
 
 export function noop (): void {}
+
+// eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+export const setPrototypeOf = Object.setPrototypeOf ||
+  // eslint-disable-next-line no-proto
+  ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b }) ||
+  function (d: any, b: any) {
+    for (const p in b) {
+      if (Object.prototype.hasOwnProperty.call(b, p)) {
+        Object.defineProperty(d, p, {
+          configurable: true,
+          writable: true,
+          enumerable: false,
+          value: b[p]
+        })
+      }
+    }
+  }

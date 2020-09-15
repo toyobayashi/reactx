@@ -6,7 +6,8 @@ import { Store, ProviderStores } from './Store'
 const Display: React.FC<{ store: Store }> = function Display (props) {
   console.log('Display render')
   console.log(props.store)
-  console.log(JSON.stringify(props.store.state))
+  console.log(props.store.state.deep.data.count)
+  console.log(JSON.stringify(props.store.state.deep.data.count))
   return (
     <>
       <p>{props.store.state.deep.data.count.join(', ')}</p>
