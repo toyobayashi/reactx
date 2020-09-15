@@ -40,14 +40,14 @@ export class Provider<Stores extends { [name: string]: Store<any> }> extends Rea
     }
   }
 
-  componentWillUnmount (): void {
+  public componentWillUnmount (): void {
     Object.keys(this.handlers).forEach(k => {
       this.props.stores[k as keyof Stores].off('change', this.handlers[k as keyof Stores]!)
       this.props.stores[k as keyof Stores].dispose()
     })
   }
 
-  render (): JSX.Element {
+  public render (): JSX.Element {
     return React.createElement(ReactContext.Provider, { value: this.state.contextValue }, this.props.children)
   }
 }

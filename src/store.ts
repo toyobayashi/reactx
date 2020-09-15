@@ -264,6 +264,10 @@ function emitChange (store: Store<any>): void {
  * @public
  */
 export class Store<T extends object> {
+  public static isUsingProxy (): boolean {
+    return hasProxy
+  }
+
   private _disposed: boolean
   private _events: { [event: string]: Function[] }
 

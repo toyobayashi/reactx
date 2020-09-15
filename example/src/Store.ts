@@ -1,6 +1,6 @@
 import { Store as BaseStore } from '../..'
 
-const useProxy = typeof Proxy === 'function'
+const useProxy = BaseStore.isUsingProxy()
 
 export interface StoreState {
   deep: {
