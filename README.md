@@ -194,6 +194,18 @@ npm run serve
     }
     ```
 
+* 现代浏览器普遍都已支持 ES6 的 `Proxy`，reactx 会优先使用 `Proxy` 来拦截对象，如果 JS 运行环境不支持 `Proxy`（如 IE），reactx 则会使用 `Object.defineProperty` 实现拦截，但是相比 `Proxy` 来说有更多局限性，下面会讲这两种情况下的不同行为表现。要确认 reactx 是否使用了 `Proxy`，可以调用 Store 的 `isUsingProxy` 静态方法。
+
+    ```js
+    if (reactx.Store.isUsingProxy()) {
+      // 不需要通过调用 Store.prototype.set 动态来添加属性或修改数组元素
+      // 可修改数组 length
+      // 可 delete 对象的属性
+    } else {
+      // 相反
+    }
+    ```
+
 * 在不支持 `Proxy` 的环境下，所有状态需要先定义好，不可直接动态添加，但可以通过 Store 的 `set` 方法添加。支持 `Proxy` 的环境没有此限制。
 
     ```js
