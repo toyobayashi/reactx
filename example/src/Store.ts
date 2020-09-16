@@ -22,6 +22,7 @@ export class Store extends BaseStore<StoreState> {
   }
 
   public increment (): void {
+    console.log(this.state.deep.data.count.push.name)
     this.state.deep.data.count.push(this.state.deep.data.count.length)
     if (useProxy) {
       this.state.deep.data.count[0]++
@@ -38,6 +39,9 @@ export class Store extends BaseStore<StoreState> {
         this.set(this.state.deep.data.count, 0, this.state.deep.data.count[0] - 1)
       }
       this.state.deep.data.count.length--
+      if (!useProxy) {
+        (this.state.deep.data.count as any).__origin__.length--
+      }
     }
   }
 

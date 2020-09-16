@@ -10,6 +10,8 @@ import {
 
 type ChangeCallback = () => void
 
+const observe = hasProxy ? tryCreateProxy : tryObserve
+
 const arrayMethodsToPatch = [
   'push',
   'pop',
@@ -20,73 +22,52 @@ const arrayMethodsToPatch = [
   'reverse'
 ]
 
-function patchArray (obj: any[], proxyTarget: any[], onChange?: ChangeCallback): void {
-  const overwrite = {
-    push (...items: any[]) {
-      obj.push(...items)
-      const r = Array.prototype.push.apply(proxyTarget, items.map(value => tryCreateProxy(value, onChange)))
-      if (typeof onChange === 'function') onChange()
-      return r
-    },
-    unshift (...items: any[]) {
-      obj.unshift(...items)
-      const r = Array.prototype.unshift.apply(proxyTarget, items.map(value => tryCreateProxy(value, onChange)))
-      if (typeof onChange === 'function') onChange()
-      return r
-    },
-    pop () {
-      obj.pop()
-      const length = proxyTarget.length
-      const item = Array.prototype.pop.call(proxyTarget)
-      if (length !== 0) {
-        if (typeof onChange === 'function') onChange()
-      }
-      return item
-    },
-    shift () {
-      obj.shift()
-      const length = proxyTarget.length
-      const item = Array.prototype.shift.call(proxyTarget)
-      if (length !== 0) {
-        if (typeof onChange === 'function') onChange()
-      }
-      return item
-    },
-    splice (start: number, deleteCount: number, ...items: any[]): any[] {
-      obj.splice(start, deleteCount, ...items)
-      const r = Array.prototype.splice.call(proxyTarget, start, deleteCount, ...(items.map((value) => tryCreateProxy(value, onChange))))
-      if (typeof onChange === 'function') onChange()
-      return r
-    },
-    sort (compareFn?: (a: any, b: any) => number) {
-      obj.sort(compareFn)
-      const r = Array.prototype.sort.call(proxyTarget, compareFn)
-      const length = proxyTarget.length
-      if (length !== 0) {
-        if (typeof onChange === 'function') onChange()
-      }
-      return r
-    },
-    reverse () {
-      obj.reverse()
-      const r = Array.prototype.reverse.call(proxyTarget)
-      const length = proxyTarget.length
-      if (length !== 0) {
-        if (typeof onChange === 'function') onChange()
-      }
-      return r
+function definePropertyNonEnumerable (o: any, name: string | number | symbol, value: any): any {
+  return Object.defineProperty(o, name, {
+    configurable: true,
+    writable: true,
+    enumerable: false,
+    value
+  })
+}
+
+function patchArrayMethods (obj: any[], proxyTarget: any[], onChange?: ChangeCallback): void {
+  const common = function (name: string, args: IArguments): any {
+    Array.prototype[name as any].apply(obj, args)
+    let items: any[] | IArguments
+    let shouldNotify: boolean = false
+    switch (name) {
+      case 'push':
+      case 'unshift':
+        items = Array.prototype.map.call(args, value => observe(value, onChange))
+        shouldNotify = true
+        break
+      case 'splice':
+        items = Array.prototype.map.call(args, (value, i) => i > 1 ? observe(value, onChange) : value)
+        shouldNotify = true
+        break
+      default:
+        items = args
+        shouldNotify = proxyTarget.length > 0
+        break
     }
+    const r = Array.prototype[name as any].apply(proxyTarget, items)
+    if (shouldNotify && typeof onChange === 'function') onChange()
+    return r
   }
 
   const proto: any = []
-  Object.keys(overwrite).forEach(m => {
-    Object.defineProperty(proto, m, {
-      configurable: true,
-      writable: true,
-      enumerable: false,
-      value: overwrite[m as keyof typeof overwrite]
+
+  if (isIE9 || isIE10) {
+    arrayMethodsToPatch.forEach(m => {
+      proto[m] = function (): any { return common(m, arguments) }
     })
-  })
+  } else {
+    arrayMethodsToPatch.forEach(m => {
+      definePropertyNonEnumerable(proto, m, function (): any { return common(m, arguments) })
+    })
+  }
+
   setPrototypeOf(proxyTarget, proto)
 }
 
@@ -143,7 +124,7 @@ function tryCreateProxy (obj: any, onChange?: ChangeCallback): any {
     }
     obj.forEach(observeItem)
 
-    patchArray(obj, a, onChange)
+    patchArrayMethods(obj, a, onChange)
     const proxy = new Proxy(a, createProxyHandlers(obj, onChange))
     return proxy
   } else {
@@ -202,45 +183,7 @@ function tryObserve (obj: any, onChange?: ChangeCallback): any {
       value: obj
     })
 
-    const proto: any = []
-    arrayMethodsToPatch.forEach(m => {
-      const method = function (this: any[], ...args: any[]): any {
-        obj[m as any](...args)
-        let items: any[]
-        let shouldNotify: boolean = false
-        switch (m) {
-          case 'push':
-          case 'unshift':
-            items = args.map(mapItem)
-            shouldNotify = true
-            break
-          case 'splice':
-            items = args.map((value, i) => i > 1 ? tryObserve(value, onChange) : value)
-            shouldNotify = true
-            break
-          default:
-            items = args
-            shouldNotify = this.length > 0
-            break
-        }
-
-        const r = Array.prototype[m as any].apply(this, items)
-        if (shouldNotify && typeof onChange === 'function') onChange()
-        return r
-      }
-      if (isIE9 || isIE10) {
-        proto[m as any] = method
-      } else {
-        Object.defineProperty(proto, m, {
-          configurable: true,
-          writable: true,
-          enumerable: false,
-          value: method
-        })
-      }
-    })
-    setPrototypeOf(a, proto)
-
+    patchArrayMethods(obj, a, onChange)
     return a
   } else {
     return obj
@@ -252,8 +195,6 @@ function ensureStoreAvailable (obj: any): void {
     throw new Error('Cannot call method of a disposed store')
   }
 }
-
-const observe = hasProxy ? tryCreateProxy : tryObserve
 
 function emitChange (store: Store<any>): void {
   store.emit('change')

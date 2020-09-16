@@ -2,7 +2,8 @@
   "name": "react-store",
   "version": "1.0.0",
   "scripts": {
-    "serve": "ty serve"
+    "serve": "ty serve",
+    "build": "ty build"
   },
   "devDependencies": {
     "@tybys/ty": "0.12.1",
