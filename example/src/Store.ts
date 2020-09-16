@@ -1,4 +1,4 @@
-import { Store as BaseStore } from '../..'
+import { Store as BaseStore, StrictStore } from '../..'
 
 const useProxy = BaseStore.isUsingProxy()
 
@@ -9,6 +9,37 @@ export interface StoreState {
     }
   }
 }
+
+export const store = new StrictStore({
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  state: {
+    deep: {
+      data: {
+        count: [0]
+      }
+    }
+  } as StoreState,
+  getters: {
+    c (state) {
+      return state.deep.data.count[0]
+    },
+    countDouble (state) {
+      return state.deep.data.count[0] * 2
+    }
+  },
+  actions: {
+    increment (state) {
+      console.log(state.deep.data.count.push.name)
+      state.deep.data.count.push(state.deep.data.count.length)
+      if (useProxy) {
+        state.deep.data.count[0]++
+      } else {
+        store.set(state.deep.data.count, 0, state.deep.data.count[0] + 1)
+      }
+      return Promise.resolve()
+    }
+  }
+})
 
 export class Store extends BaseStore<StoreState> {
   public constructor () {
@@ -70,8 +101,8 @@ export class Store extends BaseStore<StoreState> {
   }
 }
 
-export const store = new Store()
+// export const store = new Store()
 
 export type ProviderStores = {
-  store: Store
+  store: typeof store
 }

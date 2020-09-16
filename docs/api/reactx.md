@@ -12,6 +12,7 @@ Reactive state management library for React.
 |  --- | --- |
 |  [Provider](./reactx.provider.md) | Provider component |
 |  [Store](./reactx.store.md) | Store class |
+|  [StrictStore](./reactx.strictstore.md) |  |
 
 ## Functions
 
