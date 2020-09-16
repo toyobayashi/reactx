@@ -196,7 +196,7 @@ function ensureStoreAvailable (obj: any): void {
   }
 }
 
-function emitChange (store: Store<any>): void {
+function emitChange<T extends Store<any>> (store: T): void {
   store.emit('change')
 }
 
