@@ -237,7 +237,7 @@ npm run serve
     }
     ```
 
-* 数组的 `push`, `pop`, `shift`, `unshift`, `splice`, `sort`, `reverse` 方法可以被监听到从而触发更新视图。在不支持 `Proxy` 的环境下，通过索引修改数组元素，或直接修改数组的 `length` 是不可监听的，支持 `Proxy` 的环境没有此限制。
+* 数组的 `push`, `pop`, `shift`, `unshift`, `splice`, `sort`, `reverse` 方法可以被监听到从而触发更新视图，但是这些方法的 `Function.prototype.name` 是空字符串 `''`。在不支持 `Proxy` 的环境下，通过索引修改数组元素，或直接修改数组的 `length` 是不可监听的，支持 `Proxy` 的环境没有此限制。
 
     ```js
     class extends reactx.Store {
@@ -247,6 +247,7 @@ npm run serve
 
       change () {
         this.state.arr.push(10) // OK
+        this.state.arr.push.name === '' // 不是 'push'
 
         this.state.arr[0] = 5 // 不支持 Proxy 的环境不会更新视图
         this.set(this.state.arr, 0, 5) // OK
