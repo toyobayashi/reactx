@@ -14,7 +14,7 @@
 
 * TypeScript 友好！
 
-* 类似 Vue 的响应式原理，以最简洁最、直观的方式修改全局状态！等号赋值即可改变视图，要的就是简单、好用！
+* 类似 Vue 的响应式原理，以最简洁、最直观的方式修改全局状态！等号赋值即可改变视图，要的就是简单、好用！
 
 ## 获取
 
@@ -65,7 +65,7 @@ npm run serve
 
       // getter
       get countDouble () {
-        return this.state.count * 5
+        return this.state.count * 2
       }
 
       // 异步 action
@@ -93,7 +93,7 @@ npm run serve
       getters: {
         countDouble (state) {
           // state === this.state
-          return state.count * 5
+          return state.count * 2
         }
       },
       actions: {
@@ -158,7 +158,7 @@ npm run serve
     const Display = function Display (props) {
       // 默认注入到组件的 stores 属性，它就是传入 Provider 组件的 stores
       const store = props.stores.counterStore
-      return <p>{store.state.count} * 5 = {store.countDouble}</p>
+      return <p>{store.state.count} * 2 = {store.countDouble}</p>
     }
     const ConnectedDisplay = connect()(Display)
 
