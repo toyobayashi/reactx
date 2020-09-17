@@ -2,26 +2,19 @@
 
 响应式的 React 全局状态管理。
 
-## 为什么不用 Redux ？
+[API 文档](./docs/api/index.md)
 
-用过的都知道，太啰里吧嗦了，为了支持异步操作还需要做出额外的选择： thunk / saga / ...
+## 为什么使用 Reactx ？
 
-条条框框太多，虽然约束力很强，但是写出来的代码实在是可以用坨来形容，如果是个人开发的小项目的话没什么必要。
+* 没有深奥难懂的概念，几乎没有学习成本，5 分钟可上手！
 
-## 为什么不用 Mobx ？
-
-看到装饰器就怕，大坑。现阶段应尽量避免去用任何深度依赖装饰器的库。虽然 Mobx 可以不使用装饰器，但是写起来还是有点别扭的。
-
-## 为什么用 Reactx ？
-
-* 以最简洁最直观的方式修改全局状态！
-* 没有 Reducer / Action / Mutaion 之类的概念！
 * 不依赖不稳定的 ES 特性（如装饰器）！
-* TypeScript 友好！
-* 面向 Store 对象，按你想要的方式编写成员方法即可，不论同步异步！
-* 类似 Vue 的响应式原理，简洁高效，符合 JavaScript 直觉，要的就是简单、好用！
 
-请看下面的用法自行体会。
+* 向下兼容到 IE9 ！
+
+* TypeScript 友好！
+
+* 类似 Vue 的响应式原理，以最简洁最、直观的方式修改全局状态！等号赋值即可改变视图，要的就是简单、好用！
 
 ## 获取
 
@@ -46,26 +39,22 @@ npm install
 npm run serve
 ```
 
-[API 文档](./docs/api/index.md)
+## 计数器示例用法
 
-## 用法
-
-写一个简单的计数器，例子在 `example` 目录中，`npm install` 然后 `npm run serve` 就可以跑起来看效果。
-
-1. 编写你的 Store 类
+1. 使用类继承来创建一个 Store
 
     ```js
     // store.js
-    import { Store as BaseStore } from '@tybys/reactx'
+    import { Store } from '@tybys/reactx'
 
-    export class Store extends BaseStore {
+    export class CounterStore extends Store {
       constructor () {
         super({
           count: 0
         }) // 传入初始状态树，该对象会被深度观测，通过 this.state 访问
       }
 
-      // 普通的成员函数，类似 Vuex 的 Mutation
+      // 同步 action
       increment () {
         this.state.count++
       }
@@ -74,12 +63,12 @@ npm run serve
         this.state.count--
       }
 
-      // 类成员访问器类似 Vuex 的 Getter
+      // getter
       get countDouble () {
         return this.state.count * 5
       }
 
-      // 普通的异步成员函数，类似 Vuex 的 Action
+      // 异步 action
       multiply () {
         return new Promise((resolve) => {
           setTimeout(resolve, 500)
@@ -89,7 +78,41 @@ npm run serve
       }
     }
 
-    export const store = new Store()
+    export const counterStore = new CounterStore()
+    ```
+
+    如果你不喜欢使用类的方式，也可以使用 `createStore` 工厂函数来创建一个 Store，这样和使用类继承创建的 Store 对象用法是一样的。
+
+    ```js
+    import { createStore } from '@tybys/react'
+
+    export const counterStore = createStore({
+      state: {
+        count: 0
+      },
+      getters: {
+        countDouble (state) {
+          // state === this.state
+          return state.count * 5
+        }
+      },
+      actions: {
+        increment (state) {
+          // state === this.state
+          state.count++
+        },
+        decrement (state) {
+          state.count--
+        },
+        multiply (state) {
+          return new Promise((resolve) => {
+            setTimeout(resolve, 500)
+          }).then(() => {
+            state.count *= 2
+          })
+        }
+      }
+    })
     ```
 
 2. 类似 `react-redux` 利用 `Provider` 全局注入你想使用的 stores
@@ -102,11 +125,11 @@ npm run serve
     import App from './App.jsx'
 
     import { Provider } from '@tybys/reactx'
-    import { store } from './store.js'
+    import { counterStore } from './store.js'
 
     ReactDom.render((
       // stores 属性需要传入一个对象，对象的所有属性值都是 store 实例
-      <Provider stores={{ store }}>
+      <Provider stores={{ counterStore }}>
         <App />
       </Provider>
     ), document.getElementById('app'))
@@ -134,13 +157,13 @@ npm run serve
 
     const Display = function Display (props) {
       // 默认注入到组件的 stores 属性，它就是传入 Provider 组件的 stores
-      const store = props.stores.store
+      const store = props.stores.counterStore
       return <p>{store.state.count} * 5 = {store.countDouble}</p>
     }
     const ConnectedDisplay = connect()(Display)
 
     // 也可以传入函数，返回需要注入的属性
-    // connect((stores) => ({ store: stores.store }))(Display)
+    // connect((stores) => ({ store: stores.counterStore }))(Display)
     // 然后在组件中访问 props.store
 
     export default ConnectedDisplay
@@ -151,33 +174,30 @@ npm run serve
     ```jsx
     // PlusButton.jsx
     import * as React from 'react'
-
-    import { store } from './store.js'
+    import { counterStore } from './store.js'
 
     export default function PlusButton () {
-      return <button onClick={() => { store.increment() }}>+</button>
+      return <button onClick={() => { counterStore.increment() }}>+</button>
     }
     ```
 
     ```jsx
     // MinusButton.jsx
     import * as React from 'react'
-
-    import { store } from './store.js'
+    import { counterStore } from './store.js'
 
     export default function MinusButton () {
-      return <button onClick={() => { store.decrement() }}>-</button>
+      return <button onClick={() => { counterStore.decrement() }}>-</button>
     }
     ```
 
     ```jsx
     // MultiplyButton.jsx
     import * as React from 'react'
-
-    import { store } from './store.js'
+    import { counterStore } from './store.js'
 
     export default function MultiplyButton () {
-      return <button onClick={() => { store.multiply().catch(err => console.log(err)) }}>* 2</button>
+      return <button onClick={() => { counterStore.multiply().catch(err => console.log(err)) }}>* 2</button>
     }
     ```
 
@@ -198,7 +218,7 @@ npm run serve
 
     ```js
     if (reactx.Store.isUsingProxy()) {
-      // 不需要通过调用 Store.prototype.set 动态来添加属性或修改数组元素
+      // 不需要通过调用 Store.prototype.set 来动态添加属性或修改数组元素
       // 可修改数组 length
       // 可 delete 对象的属性
     } else {
