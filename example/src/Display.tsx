@@ -8,11 +8,10 @@ const Display: React.FC<{ store: typeof store }> = function Display (props) {
   console.log(props.store)
   console.log(props.store.state.deep.data.count)
   console.log(JSON.stringify(props.store.state.deep.data.count))
-  console.log(props.store.c)
   return (
     <>
       <p>{props.store.state.deep.data.count.join(', ')}</p>
-      <p>{props.store.c} * 5 = {props.store.countDouble}</p>
+      <p>{props.store.state.deep.data.count[0]} * 5 = {props.store.countDouble}</p>
     </>
   )
 }

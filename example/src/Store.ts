@@ -1,6 +1,6 @@
-import { Store as BaseStore, createStore } from '../..'
+import { Store, createStore } from '../..'
 
-const useProxy = BaseStore.isUsingProxy()
+const useProxy = Store.isUsingProxy()
 
 export interface StoreState {
   deep: {
@@ -20,30 +20,55 @@ export const store = createStore({
     }
   } as StoreState,
   getters: {
-    countDouble () {
+    countDouble (state) {
       // console.log(`store.c:${store.c}`)
-      return this.c * 5
-    },
-    c (state) {
-      return state.deep.data.count[0]
+      return state.deep.data.count[0] * 5
     }
   },
   actions: {
-    increment (state, n: number) {
-      console.log(state === this.state)
+    increment (state) {
       console.log(state.deep.data.count.push.name)
       state.deep.data.count.push(state.deep.data.count.length)
       if (useProxy) {
-        state.deep.data.count[0] += n
+        state.deep.data.count[0] += 1
       } else {
-        store.set(state.deep.data.count, 0, state.deep.data.count[0] + n)
+        store.set(state.deep.data.count, 0, state.deep.data.count[0] + 1)
       }
-      return Promise.resolve()
+    },
+    decrement (state): void {
+      if (state.deep.data.count.length > 0) {
+        if (useProxy) {
+          state.deep.data.count[0]--
+        } else {
+          this.set(state.deep.data.count, 0, state.deep.data.count[0] - 1)
+        }
+        state.deep.data.count.length--
+        if (!useProxy) {
+          (state.deep.data.count as any).__origin__.length--
+        }
+      }
+    },
+    multiply (state): Promise<void> {
+      return new Promise((resolve) => {
+        setTimeout(resolve, 500)
+      }).then(() => {
+        if (useProxy) {
+          state.deep.data.count[0] *= 2
+        } else {
+          this.set(state.deep.data.count, 0, state.deep.data.count[0] * 2)
+        }
+      })
+    },
+    reverse (state): void {
+      state.deep.data.count.reverse()
+    },
+    sort (state): void {
+      state.deep.data.count.sort((a, b) => (a - b))
     }
   }
 })
 
-export class Store extends BaseStore<StoreState> {
+export class CounterStore extends Store<StoreState> {
   public constructor () {
     super({
       deep: {
@@ -103,7 +128,7 @@ export class Store extends BaseStore<StoreState> {
   }
 }
 
-// export const store = new Store()
+export const store1 = new CounterStore()
 
 export type ProviderStores = {
   store: typeof store
