@@ -84,7 +84,7 @@ npm run serve
     如果你不喜欢使用类的方式，也可以使用 `createStore` 工厂函数来创建一个 Store，这样和使用类继承创建的 Store 对象用法是一样的。
 
     ```js
-    import { createStore } from '@tybys/react'
+    import { createStore } from '@tybys/reactx'
 
     export const counterStore = createStore({
       state: {
