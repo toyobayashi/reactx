@@ -2,7 +2,8 @@
   "extends": "./node_modules/@tybys/tsgo/tsconfig/tsconfig.cjs.json",
   "compilerOptions": {
     "outDir": "./lib/cjs",
-    "jsx": "react"
+    "jsx": "react",
+    "sourceMap": false
   },
   "include": [
     "./src/**/*"

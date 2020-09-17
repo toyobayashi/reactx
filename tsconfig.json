@@ -2,7 +2,8 @@
   "extends": "./node_modules/@tybys/tsgo/tsconfig/tsconfig.json",
   "compilerOptions": {
     "outDir": "./lib/cjs-modern",
-    "jsx": "react"
+    "jsx": "react",
+    "sourceMap": false
   },
   "include": [
     "./src/**/*"
