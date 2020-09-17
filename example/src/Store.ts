@@ -10,7 +10,7 @@ export interface StoreState {
   }
 }
 
-export const store = new StrictStore({
+export const store = StrictStore.create({
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   state: {
     deep: {

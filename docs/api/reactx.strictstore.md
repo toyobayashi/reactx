@@ -28,6 +28,7 @@ declare class StrictStore<S extends object, G extends GettersOption<S>, A extend
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
+|  [create(this, options)](./reactx.strictstore.create.md) | <code>static</code> |  |
 |  [dispatch(type, payload)](./reactx.strictstore.dispatch.md) |  |  |
 |  [dispose()](./reactx.strictstore.dispose.md) |  |  |
 

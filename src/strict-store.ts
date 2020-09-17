@@ -32,6 +32,15 @@ class StrictStore<
   G extends GettersOption<S>,
   A extends ActionsOption<S>
 > extends Store<S> {
+  public static create<
+    S extends object,
+    G extends GettersOption<S>,
+    A extends ActionsOption<S>,
+    T extends typeof StrictStore
+  > (this: T, options: StrictStoreOptions<S, G, A>): StrictStore<S, G, A> {
+    return new StrictStore(options)
+  }
+
   private readonly _gettersCache: {
     [K in keyof G]: boolean
   } = {} as any
@@ -51,13 +60,6 @@ class StrictStore<
       Object.keys(getters!).forEach(g => {
         const getterName: keyof G = g
         let getterValue: ReturnType<G[typeof getterName]>
-        try {
-          getterValue = getters![getterName](this.state)
-          this._gettersCache[getterName] = true
-        } catch (err) {
-          // getterErrors.push(err)
-          this._gettersCache[getterName] = false
-        }
 
         Object.defineProperty(this.getters, getterName, {
           configurable: true,
