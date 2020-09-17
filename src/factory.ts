@@ -1,5 +1,7 @@
-import * as store from './store'
+import { Store } from './store'
 import { isPlainObject } from './util'
+
+const store = { Store }
 
 /**
  * @public
@@ -9,7 +11,7 @@ export type ActionParameters<T extends (state: any, ...args: any) => any> = T ex
 /**
  * @public
  */
-export type IStore<S extends object, G extends GettersOption<S>, A extends ActionsOption<S>> = store.Store<S> & {
+export type IStore<S extends object, G extends GettersOption<S>, A extends ActionsOption<S>> = Store<S> & {
   readonly [K in keyof G]: ReturnType<G[K]>
 } & {
   [K in keyof A]: (...args: ActionParameters<A[K]>) => ReturnType<A[K]>
