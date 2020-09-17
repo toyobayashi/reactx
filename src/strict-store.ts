@@ -4,22 +4,31 @@ import { isPlainObject } from './util'
 /**
  * @public
  */
-export type GettersOption<S extends object> = { readonly [name: string]: (this: any, state: S) => any }
-
-/**
- * @public
- */
-export type ActionsOption<S extends object> = { readonly [name: string]: (this: any, state: S, ...args: any[]) => any }
-
-/**
- * @public
- */
 export type ActionParameters<T extends (state: any, ...args: any) => any> = T extends (state: any, ...args: infer P) => any ? P : never
 
 /**
  * @public
  */
-export interface StrictStoreOptions<
+export type IStore<S extends object, G extends GettersOption<S>, A extends ActionsOption<S>> = Store<S> & {
+  readonly [K in keyof G]: ReturnType<G[K]>
+} & {
+  [K in keyof A]: (...args: ActionParameters<A[K]>) => ReturnType<A[K]>
+}
+
+/**
+ * @public
+ */
+export type GettersOption<S extends object> = { readonly [name: string]: (this: IStore<S, GettersOption<S>, ActionsOption<S>>, state: S) => any }
+
+/**
+ * @public
+ */
+export type ActionsOption<S extends object> = { readonly [name: string]: (this: IStore<S, GettersOption<S>, ActionsOption<S>>, state: S, ...args: any[]) => any }
+
+/**
+ * @public
+ */
+export interface CreateStoreOptions<
   S extends object,
   G extends GettersOption<S>,
   A extends ActionsOption<S>
@@ -32,87 +41,74 @@ export interface StrictStoreOptions<
 /**
  * @public
  */
-class StrictStore<
+export function createStore<
   S extends object,
   G extends GettersOption<S>,
-  A extends ActionsOption<S>
-> extends Store<S> {
-  public static create<
-    S extends object,
-    G extends GettersOption<S>,
-    A extends ActionsOption<S>,
-  > (options: StrictStoreOptions<S, G, A>): StrictStore<S, G, A> & {
-    readonly [K in keyof G]: ReturnType<G[K]>
-  } & {
-    [K in keyof A]: (...args: ActionParameters<A[K]>) => ReturnType<A[K]>
-  } {
-    return new StrictStore(options) as any
+  A extends ActionsOption<S>,
+> (options: CreateStoreOptions<S, G, A>): IStore<S, G, A> {
+  const getters = options.getters
+  const _gettersCache: {
+    [K in keyof G]: boolean
+  } = {} as any
+
+  class StrictStore extends Store<S> {
+    public constructor (options: CreateStoreOptions<S, G, A>) {
+      super(options.state)
+
+      this.on('change', () => {
+        if (isPlainObject(getters)) {
+          Object.keys(getters!).forEach(g => {
+            const getterName: keyof G = g
+            _gettersCache[getterName] = false
+          })
+        }
+      })
+    }
   }
 
-  private constructor (options: StrictStoreOptions<S, G, A>) {
-    super(options.state)
+  if (isPlainObject(getters)) {
+    Object.keys(getters!).forEach(g => {
+      const getterName: keyof G = g
+      let getterValue: ReturnType<G[typeof getterName]>
 
-    const getters = options.getters
-    const _gettersCache: {
-      [K in keyof G]: boolean
-    } = {} as any
-
-    if (isPlainObject(getters)) {
-      Object.keys(getters!).forEach(g => {
-        const getterName: keyof G = g
-        let getterValue: ReturnType<G[typeof getterName]>
-
-        Object.defineProperty(this, getterName, {
-          configurable: true,
-          enumerable: true,
-          get: () => {
-            if (!_gettersCache[getterName]) {
-              getterValue = getters![getterName].call(this, this.state)
-              _gettersCache[getterName] = true
-            }
-            return getterValue
+      Object.defineProperty(StrictStore.prototype, getterName, {
+        configurable: true,
+        enumerable: false,
+        get () {
+          if (!_gettersCache[getterName]) {
+            getterValue = getters![getterName].call(this, this.state)
+            _gettersCache[getterName] = true
           }
-        })
+          return getterValue
+        }
       })
-    }
-
-    const actions = options.actions
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const _this = this
-    if (isPlainObject(actions)) {
-      Object.keys(actions!).forEach(a => {
-        const actionName: keyof A = a
-        Object.defineProperty(this, actionName, {
-          configurable: true,
-          enumerable: false,
-          writable: true,
-          value (...args: ActionParameters<A[typeof actionName]>) {
-            return actions![actionName].call(_this, _this.state, ...args)
-          }
-        })
-      })
-    }
-
-    this.on('change', () => {
-      if (isPlainObject(getters)) {
-        Object.keys(getters!).forEach(g => {
-          const getterName: keyof G = g
-          _gettersCache[getterName] = false
-        })
-      }
     })
   }
 
-  public dispatch<T extends keyof A> (type: T, ...args: ActionParameters<A[T]>): ReturnType<A[T]> {
-    if (Object.prototype.hasOwnProperty.call(this, type)) {
-      return (this as any)[type](this.state, ...args)
-    }
-    throw new Error(`Action type "${type as string}" is not defined`)
+  const actions = options.actions
+  if (isPlainObject(actions)) {
+    Object.keys(actions!).forEach(a => {
+      const actionName: keyof A = a
+      Object.defineProperty((StrictStore.prototype as any), actionName, {
+        configurable: true,
+        enumerable: false,
+        writable: true,
+        value (...args: ActionParameters<A[typeof actionName]>) {
+          return actions![actionName].call(this, this.state, ...args)
+        }
+      })
+    })
   }
 
-  public dispose (): void {
-    super.dispose()
-  }
+  return new StrictStore(options) as any
 }
 
-export { StrictStore }
+// /**
+//  * @public
+//  */
+// function dispatch<S extends object, A extends ActionsOption<any>, ST extends IStore<S, any, A>, T extends keyof A> (store: ST, type: T, ...args: Parameters<ST[T]>): ReturnType<ST[T]> {
+//   if (!(type in Store.prototype) && typeof store[type] === 'function') {
+//     return (store[type] as any)(...args)
+//   }
+//   throw new Error(`Action type "${type as string}" is not defined`)
+// }

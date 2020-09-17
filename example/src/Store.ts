@@ -1,4 +1,4 @@
-import { Store as BaseStore, StrictStore } from '../..'
+import { Store as BaseStore, createStore } from '../..'
 
 const useProxy = BaseStore.isUsingProxy()
 
@@ -10,7 +10,7 @@ export interface StoreState {
   }
 }
 
-export const store = StrictStore.create({
+export const store = createStore({
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   state: {
     deep: {
@@ -20,22 +20,23 @@ export const store = StrictStore.create({
     }
   } as StoreState,
   getters: {
-    c () {
-      return this.state.deep.data.count[0]
-    },
     countDouble () {
       // console.log(`store.c:${store.c}`)
       return this.c * 2
+    },
+    c (state) {
+      return state.deep.data.count[0]
     }
   },
   actions: {
-    increment (state) {
+    increment (state, n: number) {
+      console.log(state === this.state)
       console.log(state.deep.data.count.push.name)
       state.deep.data.count.push(state.deep.data.count.length)
       if (useProxy) {
-        state.deep.data.count[0]++
+        state.deep.data.count[0] += n
       } else {
-        store.set(state.deep.data.count, 0, state.deep.data.count[0] + 1)
+        store.set(state.deep.data.count, 0, state.deep.data.count[0] + n)
       }
       return Promise.resolve()
     }
