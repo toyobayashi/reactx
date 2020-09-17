@@ -5,7 +5,7 @@
  */
 
 import { Store } from './store'
-import { createStore, IStore, ActionParameters, GettersOption, ActionsOption, CreateStoreOptions } from './strict-store'
+import { createStore, IStore, ActionParameters, GettersOption, ActionsOption, CreateStoreOptions } from './factory'
 import { connect, InferableComponentEnhancerWithProps, Matching, GetProps, ConnectedComponent, Shared, NonReactStatics, REACT_STATICS, KNOWN_STATICS, MEMO_STATICS, FORWARD_REF_STATICS } from './connect'
 import { Provider, ProviderProps, ProviderState } from './provider'
 import { nextTick } from './tick'

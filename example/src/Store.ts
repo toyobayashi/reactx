@@ -22,7 +22,7 @@ export const store = createStore({
   getters: {
     countDouble () {
       // console.log(`store.c:${store.c}`)
-      return this.c * 2
+      return this.c * 5
     },
     c (state) {
       return state.deep.data.count[0]

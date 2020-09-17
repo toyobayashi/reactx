@@ -1,4 +1,4 @@
-import { Store } from './store'
+import * as store from './store'
 import { isPlainObject } from './util'
 
 /**
@@ -9,7 +9,7 @@ export type ActionParameters<T extends (state: any, ...args: any) => any> = T ex
 /**
  * @public
  */
-export type IStore<S extends object, G extends GettersOption<S>, A extends ActionsOption<S>> = Store<S> & {
+export type IStore<S extends object, G extends GettersOption<S>, A extends ActionsOption<S>> = store.Store<S> & {
   readonly [K in keyof G]: ReturnType<G[K]>
 } & {
   [K in keyof A]: (...args: ActionParameters<A[K]>) => ReturnType<A[K]>
@@ -51,7 +51,7 @@ export function createStore<
     [K in keyof G]: boolean
   } = {} as any
 
-  class StrictStore extends Store<S> {
+  class Store extends store.Store<S> {
     public constructor (options: CreateStoreOptions<S, G, A>) {
       super(options.state)
 
@@ -71,7 +71,7 @@ export function createStore<
       const getterName: keyof G = g
       let getterValue: ReturnType<G[typeof getterName]>
 
-      Object.defineProperty(StrictStore.prototype, getterName, {
+      Object.defineProperty(Store.prototype, getterName, {
         configurable: true,
         enumerable: false,
         get () {
@@ -89,7 +89,7 @@ export function createStore<
   if (isPlainObject(actions)) {
     Object.keys(actions!).forEach(a => {
       const actionName: keyof A = a
-      Object.defineProperty((StrictStore.prototype as any), actionName, {
+      Object.defineProperty((Store.prototype as any), actionName, {
         configurable: true,
         enumerable: false,
         writable: true,
@@ -100,7 +100,7 @@ export function createStore<
     })
   }
 
-  return new StrictStore(options) as any
+  return new Store(options) as any
 }
 
 // /**
