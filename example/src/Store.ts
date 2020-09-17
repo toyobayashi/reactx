@@ -20,11 +20,12 @@ export const store = StrictStore.create({
     }
   } as StoreState,
   getters: {
-    c (state) {
-      return state.deep.data.count[0]
+    c () {
+      return this.state.deep.data.count[0]
     },
-    countDouble (state) {
-      return state.deep.data.count[0] * 2
+    countDouble () {
+      // console.log(`store.c:${store.c}`)
+      return this.c * 2
     }
   },
   actions: {

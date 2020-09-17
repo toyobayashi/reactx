@@ -12,23 +12,11 @@ declare class StrictStore<S extends object, G extends GettersOption<S>, A extend
 ```
 <b>Extends:</b> [Store](./reactx.store.md)<!-- -->&lt;S&gt;
 
-## Constructors
-
-|  Constructor | Modifiers | Description |
-|  --- | --- | --- |
-|  [(constructor)(options)](./reactx.strictstore._constructor_.md) |  | Constructs a new instance of the <code>StrictStore</code> class |
-
-## Properties
-
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [getters](./reactx.strictstore.getters.md) |  | { \[K in keyof G\]: ReturnType&lt;G\[K\]&gt;; } |  |
-
 ## Methods
 
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
-|  [create(this, options)](./reactx.strictstore.create.md) | <code>static</code> |  |
-|  [dispatch(type, payload)](./reactx.strictstore.dispatch.md) |  |  |
+|  [create(options)](./reactx.strictstore.create.md) | <code>static</code> |  |
+|  [dispatch(type, args)](./reactx.strictstore.dispatch.md) |  |  |
 |  [dispose()](./reactx.strictstore.dispose.md) |  |  |
 

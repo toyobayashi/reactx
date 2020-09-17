@@ -7,17 +7,20 @@
 <b>Signature:</b>
 
 ```typescript
-static create<S extends object, G extends GettersOption<S>, A extends ActionsOption<S>, T extends typeof StrictStore>(this: T, options: StrictStoreOptions<S, G, A>): StrictStore<S, G, A>;
+static create<S extends object, G extends GettersOption<S>, A extends ActionsOption<S>>(options: StrictStoreOptions<S, G, A>): StrictStore<S, G, A> & {
+        readonly [K in keyof G]: ReturnType<G[K]>;
+    } & {
+        [K in keyof A]: (...args: ActionParameters<A[K]>) => ReturnType<A[K]>;
+    };
 ```
 
 ## Parameters
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  this | T |  |
 |  options | StrictStoreOptions&lt;S, G, A&gt; |  |
 
 <b>Returns:</b>
 
-StrictStore&lt;S, G, A&gt;
+StrictStore&lt;S, G, A&gt; &amp; { readonly \[K in keyof G\]: ReturnType&lt;G\[K\]&gt;; } &amp; { \[K in keyof A\]: (...args: ActionParameters&lt;A\[K\]&gt;) =&gt; ReturnType&lt;A\[K\]&gt;; }
 

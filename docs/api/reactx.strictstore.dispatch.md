@@ -7,7 +7,7 @@
 <b>Signature:</b>
 
 ```typescript
-dispatch<T extends keyof A>(type: T, payload?: Parameters<A[T]>[1]): ReturnType<A[T]>;
+dispatch<T extends keyof A>(type: T, ...args: ActionParameters<A[T]>): ReturnType<A[T]>;
 ```
 
 ## Parameters
@@ -15,7 +15,7 @@ dispatch<T extends keyof A>(type: T, payload?: Parameters<A[T]>[1]): ReturnType<
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  type | T |  |
-|  payload | Parameters&lt;A\[T\]&gt;\[1\] |  |
+|  args | ActionParameters&lt;A\[T\]&gt; |  |
 
 <b>Returns:</b>
 
