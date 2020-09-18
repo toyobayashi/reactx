@@ -214,10 +214,11 @@ npm run serve
     }
     ```
 
-* 现代浏览器普遍都已支持 ES6 的 `Proxy`，reactx 会优先使用 `Proxy` 来拦截对象，如果 JS 运行环境不支持 `Proxy`（如 IE），reactx 则会使用 `Object.defineProperty` 实现拦截，但是相比 `Proxy` 来说有更多局限性，下面会讲这两种情况下的不同行为表现。要确认 reactx 是否使用了 `Proxy`，可以调用 Store 的 `isUsingProxy` 静态方法。
+* 现代浏览器普遍都已支持 ES6 的 `Proxy`，reactx 会优先使用 `Proxy` 来拦截对象，如果 JS 运行环境不支持 `Proxy`（如 IE），reactx 则会使用 `Object.defineProperty` 实现拦截，但是相比 `Proxy` 来说有更多局限性，下面会讲这两种情况下的不同行为表现。要确认 reactx 是否使用了 `Proxy`，可以调用 `isUsingProxy` 方法。
 
     ```js
-    if (reactx.Store.isUsingProxy()) {
+    import { isUsingProxy } from '@tybys/reactx'
+    if (isUsingProxy()) {
       // 不需要通过调用 Store.prototype.set 来动态添加属性或修改数组元素
       // 可修改数组 length
       // 可 delete 对象的属性
