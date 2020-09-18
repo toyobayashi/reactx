@@ -1,4 +1,4 @@
-import { Store } from './store'
+import { Store, disabledKeys } from './store'
 import { isPlainObject } from './util'
 
 const store = { Store }
@@ -40,6 +40,17 @@ export interface CreateStoreOptions<
   actions?: A
 }
 
+function check (o: { [k: string]: any }, notAllowed: string[]): void {
+  const keys = Object.keys(o)
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i]
+    // eslint-disable-next-line @typescript-eslint/prefer-includes
+    if (notAllowed.indexOf(k) !== -1) {
+      throw new Error(`Invalid key: "${k}"`)
+    }
+  }
+}
+
 /**
  * @public
  */
@@ -61,12 +72,12 @@ export function createStore<
       if (init) {
         throw new Error('Construction is not allowed')
       }
-      init = true
       super(options.state)
 
       unsubscribe = this.subscribe(() => {
         _gettersCache = {}
       })
+      init = true
     }
 
     public dispose (): void {
@@ -75,8 +86,11 @@ export function createStore<
     }
   }
 
+  let getterKeys: string[] = []
   if (isPlainObject(getters)) {
-    Object.keys(getters!).forEach(g => {
+    check(getters!, disabledKeys)
+    getterKeys = Object.keys(getters!)
+    getterKeys.forEach(g => {
       const getterName: keyof G = g
       let getterValue: ReturnType<G[typeof getterName]>
 
@@ -97,9 +111,10 @@ export function createStore<
 
   const actions = options.actions
   if (isPlainObject(actions)) {
+    check(actions!, [...disabledKeys, ...getterKeys])
     Object.keys(actions!).forEach(a => {
       const actionName: keyof A = a
-      Object.defineProperty((Store.prototype as any), actionName, {
+      Object.defineProperty(Store.prototype, actionName, {
         configurable: true,
         enumerable: false,
         writable: true,

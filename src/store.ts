@@ -334,3 +334,12 @@ export class Store<T extends object> {
     }
   }
 }
+
+export const disabledKeys = [
+  '_disposed',
+  '_event',
+  'state',
+  'set',
+  'subscribe',
+  'dispose'
+]
