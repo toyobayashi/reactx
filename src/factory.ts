@@ -1,4 +1,4 @@
-import { Store, disabledKeys } from './store'
+import { Store, disabledKeys, cacheGetters, createdByFactory } from './store'
 import { isPlainObject } from './util'
 
 const store = { Store }
@@ -60,9 +60,7 @@ export function createStore<
   A extends ActionsOption<S>,
 > (options: CreateStoreOptions<S, G, A>): IStore<S, G, A> {
   const getters = options.getters
-  let _gettersCache: {
-    [K in keyof G]?: true
-  } = {}
+  let _clearGetterCache: () => void
   let unsubscribe: () => void
 
   let init = false
@@ -75,8 +73,9 @@ export function createStore<
       super(options.state)
 
       unsubscribe = this.subscribe(() => {
-        _gettersCache = {}
+        if (typeof _clearGetterCache === 'function') _clearGetterCache()
       })
+
       init = true
     }
 
@@ -86,32 +85,18 @@ export function createStore<
     }
   }
 
+  Object.defineProperty(Store.prototype, createdByFactory, { value: true })
+
   let getterKeys: string[] = []
   if (isPlainObject(getters)) {
-    check(getters!, disabledKeys)
+    check(getters!, [...disabledKeys, createdByFactory])
     getterKeys = Object.keys(getters!)
-    getterKeys.forEach(g => {
-      const getterName: keyof G = g
-      let getterValue: ReturnType<G[typeof getterName]>
-
-      Object.defineProperty(Store.prototype, getterName, {
-        configurable: true,
-        enumerable: false,
-        get () {
-          // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-          if (!_gettersCache[getterName]) {
-            getterValue = getters![getterName].call(this, this.state)
-            _gettersCache[getterName] = true
-          }
-          return getterValue
-        }
-      })
-    })
+    _clearGetterCache = cacheGetters(Store.prototype, getters!)
   }
 
   const actions = options.actions
   if (isPlainObject(actions)) {
-    check(actions!, [...disabledKeys, ...getterKeys])
+    check(actions!, [...disabledKeys, createdByFactory, ...getterKeys])
     Object.keys(actions!).forEach(a => {
       const actionName: keyof A = a
       Object.defineProperty(Store.prototype, actionName, {

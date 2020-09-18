@@ -259,6 +259,34 @@ export function isUsingProxy (): boolean {
   return hasProxy
 }
 
+export const createdByFactory = '__createdByFactory'
+
+export function cacheGetters (proto: any, getters: { [key: string]: (state: any) => any }): () => void {
+  const getterKeys = Object.keys(getters)
+  let _gettersCache: { [key: string]: boolean } = {}
+  getterKeys.forEach(g => {
+    const getterName: string = g
+    let getterValue: any
+
+    Object.defineProperty(proto, getterName, {
+      configurable: true,
+      enumerable: false,
+      get () {
+        // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+        if (!_gettersCache[getterName]) {
+          getterValue = getters[getterName].call(this, this.state)
+          _gettersCache[getterName] = true
+        }
+        return getterValue
+      }
+    })
+  })
+
+  return (): void => {
+    _gettersCache = {}
+  }
+}
+
 /**
  * Store class
  * @public
@@ -266,6 +294,7 @@ export function isUsingProxy (): boolean {
 export class Store<T extends object> {
   private _disposed: boolean
   private readonly _event: EventEmitter
+  private readonly _clearGetterCache?: () => void
   public state!: T
 
   public constructor (initialState: T) {
@@ -274,7 +303,11 @@ export class Store<T extends object> {
     }
     this._disposed = false
     this._event = new EventEmitter()
-    const onChange = (): void => { emitChange(this) }
+
+    const onChange = (): void => {
+      emitChange(this)
+      if (typeof this._clearGetterCache === 'function') this._clearGetterCache()
+    }
     let _state = observe(initialState, onChange)
     Object.defineProperty(this, 'state', {
       configurable: true,
@@ -288,6 +321,26 @@ export class Store<T extends object> {
         onChange()
       }
     })
+
+    if (typeof Object.getOwnPropertyDescriptors === 'function' && typeof (this as any)[createdByFactory] === 'undefined') {
+      try {
+        let proto: any = Object.getPrototypeOf(this)
+        while (proto.constructor !== Store) {
+          const descs = Object.getOwnPropertyDescriptors(proto)
+          const descKeys = Object.keys(descs)
+          const getters: any = {}
+          for (let i = 0; i < descKeys.length; i++) {
+            if (typeof descs[descKeys[i]].get === 'function') {
+              getters[descKeys[i]] = descs[descKeys[i]].get
+            }
+          }
+          if (Object.keys(getters).length > 0) {
+            this._clearGetterCache = cacheGetters(proto, getters)
+          }
+          proto = Object.getPrototypeOf(proto)
+        }
+      } catch (_) {}
+    }
   }
 
   public set (observed: any, keyOrIndex: string | number, value: any): void {
@@ -303,18 +356,16 @@ export class Store<T extends object> {
     if (hasProxy) {
       observed[keyOrIndex] = value
     } else {
-      if (isObject) {
-        if (Object.prototype.hasOwnProperty.call(observed, keyOrIndex)) {
-          observed[keyOrIndex] = value
-        } else {
-          observed[originKey][keyOrIndex] = value
-          observed[keyOrIndex] = observe(value, () => { emitChange(this) })
-          emitChange(this)
-        }
+      if (isObject && Object.prototype.hasOwnProperty.call(observed, keyOrIndex)) {
+        observed[keyOrIndex] = value
       } else {
+        const onChange = (): void => {
+          emitChange(this)
+          if (typeof this._clearGetterCache === 'function') this._clearGetterCache()
+        }
         observed[originKey][keyOrIndex] = value
-        observed[keyOrIndex] = observe(value, () => { emitChange(this) })
-        emitChange(this)
+        observed[keyOrIndex] = observe(value, onChange)
+        onChange()
       }
     }
   }
@@ -338,6 +389,7 @@ export class Store<T extends object> {
 export const disabledKeys = [
   '_disposed',
   '_event',
+  '_clearGetterCache',
   'state',
   'set',
   'subscribe',
