@@ -21,12 +21,6 @@ export declare class Provider<Stores extends {
 |  --- | --- | --- |
 |  [(constructor)(props)](./reactx.provider._constructor_.md) |  | Constructs a new instance of the <code>Provider</code> class |
 
-## Properties
-
-|  Property | Modifiers | Type | Description |
-|  --- | --- | --- | --- |
-|  [handlers](./reactx.provider.handlers.md) |  | { \[P in keyof Stores\]?: Function; } |  |
-
 ## Methods
 
 |  Method | Modifiers | Description |

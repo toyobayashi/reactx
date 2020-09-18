@@ -21,18 +21,17 @@ export interface ProviderState<Stores extends { [name: string]: Store<any> }> {
  * @public
  */
 export class Provider<Stores extends { [name: string]: Store<any> }> extends React.Component<ProviderProps<Stores>, ProviderState<Stores>> {
-  public handlers: { [P in keyof Stores]?: Function }
+  private readonly _unsubscribe: { [P in keyof Stores]?: () => void }
 
   public constructor (props: ProviderProps<Stores>) {
     super(props)
-    this.handlers = {}
+    this._unsubscribe = {}
 
     Object.keys(this.props.stores).forEach(k => {
       const handler = (): void => {
         this.setState({ contextValue: { ...this.props.stores } })
       }
-      this.props.stores[k as keyof Stores].on('change', handler)
-      this.handlers[k as keyof Stores] = handler
+      this._unsubscribe[k as keyof Stores] = this.props.stores[k as keyof Stores].subscribe(handler)
     })
 
     this.state = {
@@ -41,8 +40,8 @@ export class Provider<Stores extends { [name: string]: Store<any> }> extends Rea
   }
 
   public componentWillUnmount (): void {
-    Object.keys(this.handlers).forEach(k => {
-      this.props.stores[k as keyof Stores].off('change', this.handlers[k as keyof Stores]!)
+    Object.keys(this._unsubscribe).forEach(k => {
+      this._unsubscribe[k as keyof Stores]!()
       this.props.stores[k as keyof Stores].dispose()
     })
   }

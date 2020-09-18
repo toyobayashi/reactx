@@ -196,8 +196,67 @@ function ensureStoreAvailable (obj: any): void {
   }
 }
 
+const eventName = 'change'
+
 function emitChange<T extends Store<any>> (store: T): void {
-  store.emit('change')
+  ((store as any)._event as EventEmitter).emit(eventName)
+}
+
+class EventEmitter {
+  private _events: { [event: string]: Function[] } = {}
+
+  public emit (event: string, payload?: any): boolean {
+    assertString(event, 'event')
+    if (event in this._events && Object.prototype.hasOwnProperty.call(this._events, event)) {
+      const arr = this._events[event].slice(0)
+      for (let i = 0; i < arr.length; i++) {
+        arr[i](payload)
+      }
+      return true
+    }
+    return false
+  }
+
+  public on (event: string, listener: Function): this {
+    assertString(event, 'event')
+    assertFunction(listener, 'listener')
+    if (event in this._events && Object.prototype.hasOwnProperty.call(this._events, event)) {
+      this._events[event].push(listener)
+    } else {
+      this._events[event] = []
+      this._events[event].push(listener)
+    }
+    return this
+  }
+
+  public off (event: string, listener: Function): this {
+    assertString(event, 'event')
+    assertFunction(listener, 'listener')
+    if (event in this._events && Object.prototype.hasOwnProperty.call(this._events, event)) {
+      const index = this._events[event].indexOf(listener)
+      if (index !== -1) {
+        this._events[event].splice(index, 1)
+      }
+    }
+    return this
+  }
+
+  public removeAllListeners (event?: string): void {
+    if (typeof event === 'string') {
+      if (event in this._events && Object.prototype.hasOwnProperty.call(this._events, event)) {
+        this._events[event].length = 0
+      }
+    } else {
+      this._events = {}
+    }
+  }
+}
+
+/**
+ * @public
+ */
+export function isUsingProxy (): boolean {
+  return hasProxy
 }
 
 /**
@@ -205,13 +264,8 @@ function emitChange<T extends Store<any>> (store: T): void {
  * @public
  */
 export class Store<T extends object> {
-  public static isUsingProxy (): boolean {
-    return hasProxy
-  }
-
   private _disposed: boolean
-  private _events: { [event: string]: Function[] }
-
+  private readonly _event: EventEmitter
   public state!: T
 
   public constructor (initialState: T) {
@@ -219,7 +273,7 @@ export class Store<T extends object> {
       throw new TypeError('Initial state must be a plain object or an array')
     }
     this._disposed = false
-    this._events = {}
+    this._event = new EventEmitter()
     const onChange = (): void => { emitChange(this) }
     let _state = observe(initialState, onChange)
     Object.defineProperty(this, 'state', {
@@ -265,59 +319,17 @@ export class Store<T extends object> {
     }
   }
 
-  public emit (event: string, payload?: any): boolean {
+  public subscribe (fn: () => void): () => void {
     ensureStoreAvailable(this)
-    assertString(event, 'event')
-    if (event in this._events && Object.prototype.hasOwnProperty.call(this._events, event)) {
-      const arr = this._events[event].slice(0)
-      for (let i = 0; i < arr.length; i++) {
-        arr[i](payload)
-      }
-      return true
-    }
-    return false
-  }
-
-  public on (event: string, listener: Function): this {
-    ensureStoreAvailable(this)
-    assertString(event, 'event')
-    assertFunction(listener, 'listener')
-    if (event in this._events && Object.prototype.hasOwnProperty.call(this._events, event)) {
-      this._events[event].push(listener)
-    } else {
-      this._events[event] = []
-      this._events[event].push(listener)
-    }
-    return this
-  }
-
-  public off (event: string, listener: Function): this {
-    ensureStoreAvailable(this)
-    assertString(event, 'event')
-    assertFunction(listener, 'listener')
-    if (event in this._events && Object.prototype.hasOwnProperty.call(this._events, event)) {
-      const index = this._events[event].indexOf(listener)
-      if (index !== -1) {
-        this._events[event].splice(index, 1)
-      }
-    }
-    return this
-  }
-
-  public removeAllListeners (event?: string): void {
-    ensureStoreAvailable(this)
-    if (typeof event === 'string') {
-      if (event in this._events && Object.prototype.hasOwnProperty.call(this._events, event)) {
-        this._events[event].length = 0
-      }
-    } else {
-      this._events = {}
+    this._event.on(eventName, fn)
+    return () => {
+      this._event.off(eventName, fn)
     }
   }
 
   public dispose (): void {
     if (!this._disposed) {
-      this.removeAllListeners()
+      this._event.removeAllListeners()
       this._disposed = true
     }
   }

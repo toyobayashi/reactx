@@ -29,10 +29,6 @@ export declare class Store<T extends object>
 |  Method | Modifiers | Description |
 |  --- | --- | --- |
 |  [dispose()](./reactx.store.dispose.md) |  |  |
-|  [emit(event, payload)](./reactx.store.emit.md) |  |  |
-|  [isUsingProxy()](./reactx.store.isusingproxy.md) | <code>static</code> |  |
-|  [off(event, listener)](./reactx.store.off.md) |  |  |
-|  [on(event, listener)](./reactx.store.on.md) |  |  |
-|  [removeAllListeners(event)](./reactx.store.removealllisteners.md) |  |  |
 |  [set(observed, keyOrIndex, value)](./reactx.store.set.md) |  |  |
+|  [subscribe(fn)](./reactx.store.subscribe.md) |  |  |
 

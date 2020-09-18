@@ -1,6 +1,6 @@
-import { Store, createStore } from '../..'
+import { Store, createStore, isUsingProxy } from '../..'
 
-const useProxy = Store.isUsingProxy()
+const useProxy = isUsingProxy()
 
 export interface StoreState {
   deep: {

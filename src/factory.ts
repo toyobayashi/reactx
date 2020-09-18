@@ -49,22 +49,29 @@ export function createStore<
   A extends ActionsOption<S>,
 > (options: CreateStoreOptions<S, G, A>): IStore<S, G, A> {
   const getters = options.getters
-  const _gettersCache: {
-    [K in keyof G]: boolean
-  } = {} as any
+  let _gettersCache: {
+    [K in keyof G]?: true
+  } = {}
+  let unsubscribe: () => void
+
+  let init = false
 
   class Store extends store.Store<S> {
     public constructor (options: CreateStoreOptions<S, G, A>) {
+      if (init) {
+        throw new Error('Construction is not allowed')
+      }
+      init = true
       super(options.state)
 
-      this.on('change', () => {
-        if (isPlainObject(getters)) {
-          Object.keys(getters!).forEach(g => {
-            const getterName: keyof G = g
-            _gettersCache[getterName] = false
-          })
-        }
+      unsubscribe = this.subscribe(() => {
+        _gettersCache = {}
       })
+    }
+
+    public dispose (): void {
+      unsubscribe()
+      super.dispose()
     }
   }
 
@@ -77,6 +84,7 @@ export function createStore<
         configurable: true,
         enumerable: false,
         get () {
+          // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
           if (!_gettersCache[getterName]) {
             getterValue = getters![getterName].call(this, this.state)
             _gettersCache[getterName] = true
