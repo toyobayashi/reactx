@@ -294,7 +294,7 @@ export function cacheGetters (proto: any, getters: { [key: string]: (state: any)
 export class Store<T extends object> {
   private _disposed: boolean
   private readonly _event: EventEmitter
-  private static readonly __clearGetterCacheDeps: Array<() => void>
+  // private static readonly __clearGetterCacheDeps: Array<() => void>
   public state!: T
 
   public constructor (initialState: T) {
@@ -306,7 +306,7 @@ export class Store<T extends object> {
 
     const onChange = (): void => {
       emitChange(this)
-      if (Store.__clearGetterCacheDeps.length > 0) Store.__clearGetterCacheDeps.forEach(f => f())
+      // if (Store.__clearGetterCacheDeps.length > 0) Store.__clearGetterCacheDeps.forEach(f => f())
     }
     let _state = observe(initialState, onChange)
     Object.defineProperty(this, 'state', {
@@ -322,7 +322,7 @@ export class Store<T extends object> {
       }
     })
 
-    if (typeof Object.getOwnPropertyDescriptors === 'function' && typeof (this as any)[createdByFactory] === 'undefined') {
+    /* if (typeof Object.getOwnPropertyDescriptors === 'function' && typeof (this as any)[createdByFactory] === 'undefined') {
       try {
         let proto: any = Object.getPrototypeOf(this)
         let constructor = proto.constructor
@@ -352,7 +352,7 @@ export class Store<T extends object> {
           constructor = proto.constructor
         }
       } catch (_) {}
-    }
+    } */
   }
 
   public set (observed: any, keyOrIndex: string | number, value: any): void {
@@ -373,7 +373,7 @@ export class Store<T extends object> {
       } else {
         const onChange = (): void => {
           emitChange(this)
-          if (Store.__clearGetterCacheDeps.length > 0) Store.__clearGetterCacheDeps.forEach(f => f())
+          // if (Store.__clearGetterCacheDeps.length > 0) Store.__clearGetterCacheDeps.forEach(f => f())
         }
         observed[originKey][keyOrIndex] = value
         observed[keyOrIndex] = observe(value, onChange)
@@ -398,12 +398,12 @@ export class Store<T extends object> {
   }
 }
 
-Object.defineProperty(Store, '__clearGetterCacheDeps', {
-  configurable: true,
-  enumerable: false,
-  writable: true,
-  value: []
-})
+// Object.defineProperty(Store, '__clearGetterCacheDeps', {
+//   configurable: true,
+//   enumerable: false,
+//   writable: true,
+//   value: []
+// })
 
 export const disabledKeys = [
   '_disposed',
