@@ -294,7 +294,7 @@ export function cacheGetters (proto: any, getters: { [key: string]: (state: any)
 export class Store<T extends object> {
   private _disposed: boolean
   private readonly _event: EventEmitter
-  private static readonly __clearGetterCache?: Array<() => void>
+  private static readonly __clearGetterCacheDeps: Array<() => void>
   public state!: T
 
   public constructor (initialState: T) {
@@ -306,7 +306,7 @@ export class Store<T extends object> {
 
     const onChange = (): void => {
       emitChange(this)
-      if (Store.__clearGetterCache && Store.__clearGetterCache.length > 0) Store.__clearGetterCache.forEach(f => f())
+      if (Store.__clearGetterCacheDeps.length > 0) Store.__clearGetterCacheDeps.forEach(f => f())
     }
     let _state = observe(initialState, onChange)
     Object.defineProperty(this, 'state', {
@@ -322,30 +322,34 @@ export class Store<T extends object> {
       }
     })
 
-    if (typeof Object.getOwnPropertyDescriptors === 'function' && !Store.__clearGetterCache && typeof (this as any)[createdByFactory] === 'undefined') {
+    if (typeof Object.getOwnPropertyDescriptors === 'function' && typeof (this as any)[createdByFactory] === 'undefined') {
       try {
         let proto: any = Object.getPrototypeOf(this)
-        while (proto.constructor !== Store) {
-          const descs = Object.getOwnPropertyDescriptors(proto)
-          const descKeys = Object.keys(descs)
-          const getters: any = {}
-          for (let i = 0; i < descKeys.length; i++) {
-            if (typeof descs[descKeys[i]].get === 'function') {
-              getters[descKeys[i]] = descs[descKeys[i]].get
+        let constructor = proto.constructor
+        while (constructor !== Store) {
+          if (!constructor.__clearGetterCache) {
+            const descs = Object.getOwnPropertyDescriptors(proto)
+            const descKeys = Object.keys(descs)
+            const getters: any = {}
+            for (let i = 0; i < descKeys.length; i++) {
+              if (typeof descs[descKeys[i]].get === 'function') {
+                getters[descKeys[i]] = descs[descKeys[i]].get
+              }
             }
-          }
-          if (Object.keys(getters).length > 0) {
-            if (!Store.__clearGetterCache) {
-              Object.defineProperty(Store, '__clearGetterCache', {
+            if (Object.keys(getters).length > 0) {
+              const f = cacheGetters(proto, getters)
+              Object.defineProperty(constructor, '__clearGetterCache', {
                 configurable: true,
                 enumerable: false,
                 writable: true,
-                value: []
+                value: f
               })
+              Store.__clearGetterCacheDeps.push(f)
             }
-            Store.__clearGetterCache!.push(cacheGetters(proto, getters))
           }
+
           proto = Object.getPrototypeOf(proto)
+          constructor = proto.constructor
         }
       } catch (_) {}
     }
@@ -369,7 +373,7 @@ export class Store<T extends object> {
       } else {
         const onChange = (): void => {
           emitChange(this)
-          if (Store.__clearGetterCache && Store.__clearGetterCache.length > 0) Store.__clearGetterCache.forEach(f => f())
+          if (Store.__clearGetterCacheDeps.length > 0) Store.__clearGetterCacheDeps.forEach(f => f())
         }
         observed[originKey][keyOrIndex] = value
         observed[keyOrIndex] = observe(value, onChange)
@@ -393,6 +397,13 @@ export class Store<T extends object> {
     }
   }
 }
+
+Object.defineProperty(Store, '__clearGetterCacheDeps', {
+  configurable: true,
+  enumerable: false,
+  writable: true,
+  value: []
+})
 
 export const disabledKeys = [
   '_disposed',
