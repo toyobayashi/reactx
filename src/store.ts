@@ -294,7 +294,7 @@ export function cacheGetters (proto: any, getters: { [key: string]: (state: any)
 export class Store<T extends object> {
   private _disposed: boolean
   private readonly _event: EventEmitter
-  private readonly _clearGetterCache?: () => void
+  private static readonly __clearGetterCache?: Array<() => void>
   public state!: T
 
   public constructor (initialState: T) {
@@ -306,7 +306,7 @@ export class Store<T extends object> {
 
     const onChange = (): void => {
       emitChange(this)
-      if (typeof this._clearGetterCache === 'function') this._clearGetterCache()
+      if (Store.__clearGetterCache && Store.__clearGetterCache.length > 0) Store.__clearGetterCache.forEach(f => f())
     }
     let _state = observe(initialState, onChange)
     Object.defineProperty(this, 'state', {
@@ -322,7 +322,7 @@ export class Store<T extends object> {
       }
     })
 
-    if (typeof Object.getOwnPropertyDescriptors === 'function' && typeof (this as any)[createdByFactory] === 'undefined') {
+    if (typeof Object.getOwnPropertyDescriptors === 'function' && !Store.__clearGetterCache && typeof (this as any)[createdByFactory] === 'undefined') {
       try {
         let proto: any = Object.getPrototypeOf(this)
         while (proto.constructor !== Store) {
@@ -335,7 +335,15 @@ export class Store<T extends object> {
             }
           }
           if (Object.keys(getters).length > 0) {
-            this._clearGetterCache = cacheGetters(proto, getters)
+            if (!Store.__clearGetterCache) {
+              Object.defineProperty(Store, '__clearGetterCache', {
+                configurable: true,
+                enumerable: false,
+                writable: true,
+                value: []
+              })
+            }
+            Store.__clearGetterCache!.push(cacheGetters(proto, getters))
           }
           proto = Object.getPrototypeOf(proto)
         }
@@ -361,7 +369,7 @@ export class Store<T extends object> {
       } else {
         const onChange = (): void => {
           emitChange(this)
-          if (typeof this._clearGetterCache === 'function') this._clearGetterCache()
+          if (Store.__clearGetterCache && Store.__clearGetterCache.length > 0) Store.__clearGetterCache.forEach(f => f())
         }
         observed[originKey][keyOrIndex] = value
         observed[keyOrIndex] = observe(value, onChange)
@@ -389,7 +397,6 @@ export class Store<T extends object> {
 export const disabledKeys = [
   '_disposed',
   '_event',
-  '_clearGetterCache',
   'state',
   'set',
   'subscribe',
