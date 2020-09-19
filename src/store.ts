@@ -259,11 +259,8 @@ export function isUsingProxy (): boolean {
   return hasProxy
 }
 
-export const createdByFactory = '__createdByFactory'
-
-export function cacheGetters (proto: any, getters: { [key: string]: (state: any) => any }): () => void {
+export function cacheGetters (proto: any, getters: { [key: string]: (state: any) => any }): void {
   const getterKeys = Object.keys(getters)
-  let _gettersCache: { [key: string]: boolean } = {}
   getterKeys.forEach(g => {
     const getterName: string = g
     let getterValue: any
@@ -272,19 +269,17 @@ export function cacheGetters (proto: any, getters: { [key: string]: (state: any)
       configurable: true,
       enumerable: false,
       get () {
-        // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-        if (!_gettersCache[getterName]) {
+        if (!this._gettersCache) {
+          this._gettersCache = {}
+        }
+        if (!this._gettersCache[getterName]) {
           getterValue = getters[getterName].call(this, this.state)
-          _gettersCache[getterName] = true
+          this._gettersCache[getterName] = true
         }
         return getterValue
       }
     })
   })
-
-  return (): void => {
-    _gettersCache = {}
-  }
 }
 
 /**
@@ -294,7 +289,7 @@ export function cacheGetters (proto: any, getters: { [key: string]: (state: any)
 export class Store<T extends object> {
   private _disposed: boolean
   private readonly _event: EventEmitter
-  // private static readonly __clearGetterCacheDeps: Array<() => void>
+  protected _gettersCache: { [key: string]: boolean }
   public state!: T
 
   public constructor (initialState: T) {
@@ -303,10 +298,11 @@ export class Store<T extends object> {
     }
     this._disposed = false
     this._event = new EventEmitter()
+    this._gettersCache = {}
 
     const onChange = (): void => {
       emitChange(this)
-      // if (Store.__clearGetterCacheDeps.length > 0) Store.__clearGetterCacheDeps.forEach(f => f())
+      this._gettersCache = {}
     }
     let _state = observe(initialState, onChange)
     Object.defineProperty(this, 'state', {
@@ -322,29 +318,25 @@ export class Store<T extends object> {
       }
     })
 
-    /* if (typeof Object.getOwnPropertyDescriptors === 'function' && typeof (this as any)[createdByFactory] === 'undefined') {
+    if (typeof Object.getOwnPropertyDescriptors === 'function') {
       try {
         let proto: any = Object.getPrototypeOf(this)
         let constructor = proto.constructor
         while (constructor !== Store) {
-          if (!constructor.__clearGetterCache) {
+          if (!constructor.__cached) {
+            Object.defineProperty(constructor, '__cached', { value: true })
             const descs = Object.getOwnPropertyDescriptors(proto)
             const descKeys = Object.keys(descs)
             const getters: any = {}
+            let shouldOverwrite = false
             for (let i = 0; i < descKeys.length; i++) {
               if (typeof descs[descKeys[i]].get === 'function') {
                 getters[descKeys[i]] = descs[descKeys[i]].get
+                shouldOverwrite = true
               }
             }
-            if (Object.keys(getters).length > 0) {
-              const f = cacheGetters(proto, getters)
-              Object.defineProperty(constructor, '__clearGetterCache', {
-                configurable: true,
-                enumerable: false,
-                writable: true,
-                value: f
-              })
-              Store.__clearGetterCacheDeps.push(f)
+            if (shouldOverwrite) {
+              cacheGetters(proto, getters)
             }
           }
 
@@ -352,7 +344,7 @@ export class Store<T extends object> {
           constructor = proto.constructor
         }
       } catch (_) {}
-    } */
+    }
   }
 
   public set (observed: any, keyOrIndex: string | number, value: any): void {
@@ -373,7 +365,7 @@ export class Store<T extends object> {
       } else {
         const onChange = (): void => {
           emitChange(this)
-          // if (Store.__clearGetterCacheDeps.length > 0) Store.__clearGetterCacheDeps.forEach(f => f())
+          this._gettersCache = {}
         }
         observed[originKey][keyOrIndex] = value
         observed[keyOrIndex] = observe(value, onChange)
@@ -398,16 +390,10 @@ export class Store<T extends object> {
   }
 }
 
-// Object.defineProperty(Store, '__clearGetterCacheDeps', {
-//   configurable: true,
-//   enumerable: false,
-//   writable: true,
-//   value: []
-// })
-
 export const disabledKeys = [
   '_disposed',
   '_event',
+  '_gettersCache',
   'state',
   'set',
   'subscribe',

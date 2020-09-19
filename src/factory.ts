@@ -1,4 +1,4 @@
-import { Store, disabledKeys, cacheGetters, createdByFactory } from './store'
+import { Store, disabledKeys, cacheGetters } from './store'
 import { isPlainObject } from './util'
 
 const store = { Store }
@@ -60,8 +60,6 @@ export function createStore<
   A extends ActionsOption<S>,
 > (options: CreateStoreOptions<S, G, A>): IStore<S, G, A> {
   const getters = options.getters
-  let _clearGetterCache: () => void
-  let unsubscribe: () => void
 
   let init = false
 
@@ -72,31 +70,22 @@ export function createStore<
       }
       super(options.state)
 
-      unsubscribe = this.subscribe(() => {
-        if (typeof _clearGetterCache === 'function') _clearGetterCache()
-      })
-
       init = true
-    }
-
-    public dispose (): void {
-      unsubscribe()
-      super.dispose()
     }
   }
 
-  Object.defineProperty(Store.prototype, createdByFactory, { value: true })
+  Object.defineProperty(Store, '__cached', { value: true })
 
   let getterKeys: string[] = []
   if (isPlainObject(getters)) {
-    check(getters!, [...disabledKeys, createdByFactory])
+    check(getters!, disabledKeys)
     getterKeys = Object.keys(getters!)
-    _clearGetterCache = cacheGetters(Store.prototype, getters!)
+    cacheGetters(Store.prototype, getters!)
   }
 
   const actions = options.actions
   if (isPlainObject(actions)) {
-    check(actions!, [...disabledKeys, createdByFactory, ...getterKeys])
+    check(actions!, [...disabledKeys, ...getterKeys])
     Object.keys(actions!).forEach(a => {
       const actionName: keyof A = a
       Object.defineProperty(Store.prototype, actionName, {
