@@ -7,7 +7,5 @@
 <b>Signature:</b>
 
 ```typescript
-protected _gettersCache: {
-        [key: string]: boolean;
-    };
+protected _gettersCache: Record<string, boolean>;
 ```

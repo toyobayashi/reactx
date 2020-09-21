@@ -22,7 +22,7 @@ export declare class Store<T extends object>
 
 |  Property | Modifiers | Type | Description |
 |  --- | --- | --- | --- |
-|  [\_gettersCache](./reactx.store._getterscache.md) |  | { \[key: string\]: boolean; } |  |
+|  [\_gettersCache](./reactx.store._getterscache.md) |  | Record&lt;string, boolean&gt; |  |
 |  [state](./reactx.store.state.md) |  | T |  |
 
 ## Methods
