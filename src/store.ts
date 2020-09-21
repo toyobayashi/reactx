@@ -203,7 +203,7 @@ function emitChange<T extends Store<any>> (store: T): void {
 }
 
 class EventEmitter {
-  private _events: { [event: string]: Function[] } = {}
+  private _events: Record<string, Function[]> = {}
 
   public emit (event: string, payload?: any): boolean {
     assertString(event, 'event')
@@ -259,7 +259,7 @@ export function isUsingProxy (): boolean {
   return hasProxy
 }
 
-export function cacheGetters (proto: any, getters: { [key: string]: (state: any) => any }): void {
+export function cacheGetters<S extends object> (proto: any, getters: Record<string, (state: S) => any>): void {
   const getterKeys = Object.keys(getters)
   getterKeys.forEach(g => {
     const getterName: string = g
@@ -289,7 +289,7 @@ export function cacheGetters (proto: any, getters: { [key: string]: (state: any)
 export class Store<T extends object> {
   private _disposed: boolean
   private readonly _event: EventEmitter
-  protected _gettersCache: { [key: string]: boolean }
+  protected _gettersCache: Record<string, boolean>
   public state!: T
 
   public constructor (initialState: T) {
@@ -336,7 +336,7 @@ export class Store<T extends object> {
               }
             }
             if (shouldOverwrite) {
-              cacheGetters(proto, getters)
+              cacheGetters<T>(proto, getters)
             }
           }
 

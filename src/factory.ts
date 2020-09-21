@@ -40,7 +40,7 @@ export interface CreateStoreOptions<
   actions?: A
 }
 
-function check (o: { [k: string]: any }, notAllowed: string[]): void {
+function check (o: Record<string, any>, notAllowed: string[]): void {
   const keys = Object.keys(o)
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i]
@@ -80,7 +80,7 @@ export function createStore<
   if (isPlainObject(getters)) {
     check(getters!, disabledKeys)
     getterKeys = Object.keys(getters!)
-    cacheGetters(Store.prototype, getters!)
+    cacheGetters<S>(Store.prototype, getters!)
   }
 
   const actions = options.actions
